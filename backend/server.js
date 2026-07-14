@@ -45,17 +45,13 @@ const DailyLog = require('./models/DailyLog');
 // 1. JWT AUTH & USER MANAGEMENT
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { name, email, password, role, department, securityCode } = req.body;
+    const { name, email, password, role, department } = req.body;
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ success: false, msg: 'User already exists' });
 
-    if (!securityCode || securityCode !== '002') {
-      return res.status(400).json({ success: false, msg: 'Invalid or missing company verification code. Registration request cannot be sent.' });
-    }
-
     user = await User.create({ name, email, password, role, department });
     const token = user.getSignedJwtToken();
-    res.status(201).json({ success: true, token, user: { id: user._id, name, email, role } });
+    res.status(201).json({ success: true, token, user: { id: user._id, name, email, role, status: user.status } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -73,7 +69,39 @@ app.post('/api/auth/login', async (req, res) => {
     if (!isMatch) return res.status(401).json({ success: false, msg: 'Invalid credentials' });
 
     const token = user.getSignedJwtToken();
-    res.status(200).json({ success: true, token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+    res.status(200).json({ success: true, token, user: { id: user._id, name: user.name, email: user.email, role: user.role, status: user.status } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET all users
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await User.find();
+    res.status(200).json({ success: true, count: users.length, data: users.map(u => ({ id: u._id, name: u.name, email: u.email, role: u.role, department: u.department, status: u.status })) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Approve user registration
+app.put('/api/users/:id/approve', async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(req.params.id, { status: 'Active' }, { new: true });
+    if (!user) return res.status(404).json({ success: false, msg: 'User not found' });
+    res.status(200).json({ success: true, data: { id: user._id, name: user.name, email: user.email, role: user.role, status: user.status } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Decline user registration
+app.put('/api/users/:id/decline', async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ success: false, msg: 'User not found' });
+    res.status(200).json({ success: true, data: { id: user._id, name: user.name, email: user.email, role: user.role, status: 'Inactive' } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

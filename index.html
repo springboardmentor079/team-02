@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BuildTrack: Construction Project Management & Site Monitoring Platform</title>
+    <title>BuildTrack: Enterprise Operations & Project Management Platform</title>
     
     <!-- CDNs -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -21,12 +21,12 @@
                             700: '#b45309',
                         },
                         brand: {
-                            50: '#f0fdf4',
-                            100: '#dcfce7',
-                            500: '#10b981', // Emerald theme
-                            600: '#059669',
-                            700: '#047857',
-                            900: '#064e3b',
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            500: '#6366f1', // Indigo theme
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
                         },
                         slate: {
                             850: '#1e293b'
@@ -277,7 +277,9 @@
                     glowClass: 'shadow-lg shadow-violet-500/15',
                     progressColor: 'bg-violet-600',
                     timelineBorder: 'group-hover:border-violet-500',
-                    timelineDot: 'bg-violet-500 border-violet-600 text-white'
+                    timelineDot: 'bg-violet-500 border-violet-600 text-white',
+                    gradientAccent: 'from-violet-600 to-indigo-600',
+                    accentName: 'violet'
                 },
                 'Project Manager': {
                     accentColor: 'emerald-600',
@@ -299,7 +301,9 @@
                     glowClass: 'shadow-lg shadow-emerald-500/15',
                     progressColor: 'bg-emerald-600',
                     timelineBorder: 'group-hover:border-emerald-500',
-                    timelineDot: 'bg-emerald-500 border-emerald-600 text-white'
+                    timelineDot: 'bg-emerald-500 border-emerald-600 text-white',
+                    gradientAccent: 'from-emerald-500 to-teal-600',
+                    accentName: 'emerald'
                 },
                 'Site Engineer': {
                     accentColor: 'amber-500',
@@ -321,7 +325,9 @@
                     glowClass: 'shadow-lg shadow-amber-500/15',
                     progressColor: 'bg-amber-500',
                     timelineBorder: 'group-hover:border-amber-500',
-                    timelineDot: 'bg-amber-500 border-amber-600 text-slate-950'
+                    timelineDot: 'bg-amber-500 border-amber-600 text-slate-950',
+                    gradientAccent: 'from-amber-500 to-orange-600',
+                    accentName: 'amber'
                 },
                 'Contractor': {
                     accentColor: 'blue-600',
@@ -343,7 +349,9 @@
                     glowClass: 'shadow-lg shadow-blue-500/15',
                     progressColor: 'bg-blue-600',
                     timelineBorder: 'group-hover:border-blue-500',
-                    timelineDot: 'bg-blue-500 border-blue-600 text-white'
+                    timelineDot: 'bg-blue-500 border-blue-600 text-white',
+                    gradientAccent: 'from-blue-600 to-sky-600',
+                    accentName: 'blue'
                 },
                 'Worker': {
                     accentColor: 'rose-600',
@@ -365,29 +373,33 @@
                     glowClass: 'shadow-lg shadow-rose-500/15',
                     progressColor: 'bg-rose-600',
                     timelineBorder: 'group-hover:border-rose-500',
-                    timelineDot: 'bg-rose-500 border-rose-600 text-white'
+                    timelineDot: 'bg-rose-500 border-rose-600 text-white',
+                    gradientAccent: 'from-rose-500 to-pink-600',
+                    accentName: 'rose'
                 },
                 'Client': {
-                    accentColor: 'yellow-600',
-                    accentHover: 'yellow-700',
-                    accentLight: 'yellow-500/10',
-                    accentBorder: 'border-yellow-500/20',
-                    textAccent: 'text-yellow-600 dark:text-yellow-500',
-                    textAccentMuted: 'text-yellow-500',
-                    bgAccent: 'bg-yellow-600',
-                    bgAccentHover: 'hover:bg-yellow-750',
-                    focusRing: 'focus:ring-yellow-500',
-                    badgeBg: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 border border-yellow-500/20',
-                    sidebarActive: 'bg-yellow-500 text-slate-950 font-semibold shadow-md shadow-yellow-500/20',
-                    sidebarIconActive: 'text-slate-950',
-                    sidebarHoverText: 'group-hover:text-yellow-500',
-                    avatarBorder: 'border-yellow-500',
-                    chartFill: '#eab308',
-                    buttonClass: 'bg-yellow-500 hover:bg-yellow-600 text-slate-950 shadow-lg shadow-yellow-500/10',
-                    glowClass: 'shadow-lg shadow-yellow-500/15',
-                    progressColor: 'bg-yellow-500',
-                    timelineBorder: 'group-hover:border-yellow-500',
-                    timelineDot: 'bg-yellow-500 border-yellow-600 text-slate-950'
+                    accentColor: 'cyan-600',
+                    accentHover: 'cyan-700',
+                    accentLight: 'cyan-500/10',
+                    accentBorder: 'border-cyan-500/20',
+                    textAccent: 'text-cyan-600 dark:text-cyan-400',
+                    textAccentMuted: 'text-cyan-500',
+                    bgAccent: 'bg-cyan-600',
+                    bgAccentHover: 'hover:bg-cyan-750',
+                    focusRing: 'focus:ring-cyan-500',
+                    badgeBg: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20',
+                    sidebarActive: 'bg-cyan-600 text-white font-semibold shadow-md shadow-cyan-500/20',
+                    sidebarIconActive: 'text-white',
+                    sidebarHoverText: 'group-hover:text-cyan-400',
+                    avatarBorder: 'border-cyan-500',
+                    chartFill: '#06b6d4',
+                    buttonClass: 'bg-cyan-600 hover:bg-cyan-700 text-white shadow-lg shadow-cyan-500/10',
+                    glowClass: 'shadow-lg shadow-cyan-500/15',
+                    progressColor: 'bg-cyan-600',
+                    timelineBorder: 'group-hover:border-cyan-500',
+                    timelineDot: 'bg-cyan-500 border-cyan-600 text-white',
+                    gradientAccent: 'from-cyan-500 to-blue-600',
+                    accentName: 'cyan'
                 }
             };
             return themes[role] || themes['Site Engineer'];
@@ -402,29 +414,13 @@
             const [dept, setDept] = React.useState('');
             const [securityCode, setSecurityCode] = React.useState('');
 
-            const [flirtyLine, setFlirtyLine] = React.useState(() => {
-                const lines = [
-                    "Are you a CSS class? Because you've got style. 😉",
-                    "Are you a layout wrapper? Because you hold my whole page together. ❤️",
-                    "Are you a Git repository? Because I'd commit to you anytime. 💻",
-                    "Is your name Google? Because you have everything I've been searching for. ✨",
-                    "Are you a keyboard? Because you're just my type. ⌨️",
-                    "Are you a loop? Because I keep coming back to you. 🔄",
-                    "Are you a database query? Because you've selected all of my heart. 🗄️",
-                    "Is your server running hot, or are you just happy to see my commits? 🔥"
-                ];
-                return lines[Math.floor(Math.random() * lines.length)];
-            });
+            // Clean interface state
 
             const handleSubmit = (e) => {
                 e.preventDefault();
                 if (isRegister) {
                     if (!name || !email || !password) {
                         triggerToast('Please complete all form fields.', 'error');
-                        return;
-                    }
-                    if (securityCode !== '002') {
-                        triggerToast('Invalid company verification code. Registration request cannot be sent.', 'error');
                         return;
                     }
                     onRegister(name, email, password, role, dept || 'Construction Dept');
@@ -448,22 +444,22 @@
             return (
                 <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden font-Outfit">
                     {/* Background glows */}
-                    <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl animate-pulse"></div>
-                    <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse"></div>
+                    <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+                    <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
                     <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-950/80 backdrop-blur-md">
                         {/* Info Banner left */}
-                        <div className="p-10 bg-gradient-to-br from-amber-600 to-amber-700 text-slate-950 flex flex-col justify-between relative overflow-hidden">
+                        <div className="p-10 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 text-white flex flex-col justify-between relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
                             <div>
                                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-6">
                                     <i data-lucide="hard-hat" className="w-8 h-8 text-white"></i>
                                 </div>
                                 <h2 className="text-3xl font-extrabold text-white tracking-tight leading-tight">BuildTrack Portal</h2>
-                                <p className="text-amber-100/90 text-sm mt-3 leading-relaxed">
+                                <p className="text-blue-100/90 text-sm mt-3 leading-relaxed font-light">
                                     Enterprise monitoring and operational management platform. Log daily site completions, machinery workloads, budgets, and procurements.
                                 </p>
-                                <div className="mt-4 p-3 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-semibold italic animate-pulse">
-                                    Today's sweet note: {flirtyLine}
+                                <div className="mt-4 p-3 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-semibold">
+                                    System Status: Active connection established.
                                 </div>
                             </div>
                             <div className="space-y-4 mt-8">
@@ -480,7 +476,7 @@
                                     <span className="text-xs font-semibold text-white">PDF & Excel Reporting Compilation Exports</span>
                                 </div>
                             </div>
-                            <div className="text-[10px] text-amber-250 mt-10 uppercase tracking-widest font-bold">
+                            <div className="text-[10px] text-blue-200 mt-10 uppercase tracking-widest font-bold">
                                 BuildTrack Operations V2.4
                             </div>
                         </div>
@@ -490,7 +486,7 @@
                                     <h3 className="text-xl font-bold text-white">{isRegister ? 'Register Account' : 'Security Sign In'}</h3>
                                     <button 
                                         onClick={() => { setIsRegister(!isRegister); setEmail(''); setPassword(''); setName(''); setSecurityCode(''); }}
-                                        className="text-xs text-amber-500 font-bold hover:underline"
+                                        className="text-xs text-blue-500 font-bold hover:underline"
                                     >
                                         {isRegister ? 'Switch to Login' : 'Create an Account'}
                                     </button>
@@ -529,37 +525,9 @@
                                                     <input type="text" value={dept} onChange={e => setDept(e.target.value)} placeholder="e.g. Planning Dept" className="w-full bg-slate-800/60 border border-slate-700 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
                                                 </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase flex justify-between">
-                                                    <span>Company Verification Code</span>
-                                                    <span className="text-[10px] text-amber-500 font-bold lowercase italic">(code required: 002)</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <input 
-                                                        type="password" 
-                                                        value={securityCode} 
-                                                        onChange={e => setSecurityCode(e.target.value)} 
-                                                        placeholder="••••••••" 
-                                                        className="w-full bg-slate-800/60 border border-slate-700 text-white pl-10 pr-10 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" 
-                                                        required 
-                                                    />
-                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                                                        <i data-lucide="key" className="w-4 h-4"></i>
-                                                    </div>
-                                                    {securityCode && (
-                                                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                                            {securityCode === '002' ? (
-                                                                <i data-lucide="check-circle" className="w-4 h-4 text-emerald-500"></i>
-                                                            ) : (
-                                                                <i data-lucide="x-circle" className="w-4 h-4 text-rose-500"></i>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
                                         </>
                                     )}
-                                    <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2.5 rounded-lg text-sm transition-all shadow-lg shadow-amber-500/10">
+                                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition-all shadow-lg shadow-blue-600/20">
                                         {isRegister ? 'Complete Onboarding' : 'Authenticate Session'}
                                     </button>
                                 </form>
@@ -601,9 +569,9 @@
 
             return (
                 <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden font-Outfit text-white">
-                    <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl animate-pulse"></div>
+                    <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
                     <div className="max-w-md w-full bg-slate-950/80 border border-slate-800 rounded-3xl p-8 text-center space-y-6 backdrop-blur-md">
-                        <div className="w-20 h-20 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mx-auto border border-amber-500/20">
+                        <div className="w-20 h-20 bg-blue-600/10 text-blue-500 rounded-full flex items-center justify-center mx-auto border border-blue-500/20">
                             <i data-lucide="clock" className="w-10 h-10 animate-spin" style={{ animationDuration: '6s' }}></i>
                         </div>
 
@@ -617,15 +585,15 @@
                         <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-left text-xs space-y-2">
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Requested Clearance:</span>
-                                <span className="font-bold text-amber-500">{user.role}</span>
+                                <span className="font-bold text-blue-500">{user.role}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Approver Clearance:</span>
-                                <span className="font-bold text-emerald-500">{approver}</span>
+                                <span className="font-bold text-indigo-400">{approver}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Current Status:</span>
-                                <span className="font-extrabold text-amber-500 uppercase tracking-wider animate-pulse">Pending Approval</span>
+                                <span className="font-extrabold text-blue-500 uppercase tracking-wider animate-pulse">Pending Approval</span>
                             </div>
                         </div>
 
@@ -635,17 +603,27 @@
 
                         <div className="flex gap-4 pt-2">
                             <button 
-                                onClick={() => {
-                                    // Refresh status from localStorage
-                                    const usersList = JSON.parse(localStorage.getItem('buildtrack_users') || '[]');
-                                    const latest = usersList.find(u => u.id === user.id);
-                                    if (latest && latest.status === 'Active') {
-                                        window.location.reload();
-                                    } else {
-                                        alert('Your registration status is still pending approval.');
+                                onClick={async () => {
+                                    try {
+                                        const response = await fetch('/api/users');
+                                        const data = await response.json();
+                                        if (data.success) {
+                                            const latest = data.data.find(u => u.email === user.email);
+                                            if (latest && latest.status === 'Active') {
+                                                localStorage.setItem('buildtrack_logged_in_user', JSON.stringify(latest));
+                                                window.location.reload();
+                                            } else {
+                                                alert('Your registration status is still pending approval.');
+                                            }
+                                        } else {
+                                            alert('Failed to refresh status. Please try again.');
+                                        }
+                                    } catch (err) {
+                                        console.error('Refresh status error:', err);
+                                        alert('Network error. Please try again.');
                                     }
                                 }}
-                                className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5"
+                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-blue-600/20"
                             >
                                 <i data-lucide="refresh-cw" className="w-4 h-4"></i>
                                 Refresh Status
@@ -675,21 +653,21 @@
                     <div className="space-y-2">
                         <h3 className="text-2xl font-black text-slate-850 dark:text-white">Security Restriction Access Denied</h3>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                            You attempted to access the <span className="font-bold text-amber-500">{viewRole}</span> workspace view console.
+                            You attempted to access the <span className="font-bold text-blue-500">{viewRole}</span> workspace view console.
                         </p>
                     </div>
                     <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800 text-left text-xs space-y-2.5">
                         <div className="flex justify-between">
-                            <span className="text-slate-400 font-semibold">Authenticated Account:</span>
-                            <span className="font-bold text-slate-800 dark:text-white">{currentUser.name}</span>
+                             <span className="text-slate-400 font-semibold">Authenticated Account:</span>
+                             <span className="font-bold text-slate-800 dark:text-white">{currentUser.name}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-slate-400 font-semibold">Your Security Clearance:</span>
-                            <span className="font-extrabold text-emerald-500 uppercase">{currentUser.role}</span>
+                             <span className="text-slate-400 font-semibold">Your Security Clearance:</span>
+                             <span className="font-extrabold text-emerald-500 uppercase">{currentUser.role}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-slate-400 font-semibold">Target View Requirement:</span>
-                            <span className="font-extrabold text-rose-500 uppercase">Authorized Credentials Required</span>
+                             <span className="text-slate-400 font-semibold">Target View Requirement:</span>
+                             <span className="font-extrabold text-rose-500 uppercase">Authorized Credentials Required</span>
                         </div>
                         <hr className="border-slate-200 dark:border-slate-800" />
                         <p className="text-[11px] text-slate-400 leading-relaxed">
@@ -697,7 +675,7 @@
                         </p>
                     </div>
                     <div className="flex gap-4 justify-center">
-                        <button onClick={onRevert} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/15">
+                        <button onClick={onRevert} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-blue-600/15">
                             <i data-lucide="arrow-left" className="w-4 h-4"></i>Revert to Your {currentUser.role} View
                         </button>
                         <button onClick={onLogout} className="border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-855 text-slate-600 dark:text-slate-350 font-bold px-6 py-2.5 rounded-xl text-xs flex items-center gap-2">
@@ -737,50 +715,65 @@
                 setTimeout(() => setToast(null), 3000);
             };
 
-            const handleLogin = (email, password) => {
-                const usersList = getStored('users', INITIAL_USERS);
-                const found = usersList.find(u => u.email === email && u.password === password);
-                if (found) {
-                    setCurrentUser(found);
-                    setStored('logged_in_user', found);
-                    setViewRole(found.role);
-                    setStored('active_view_role', found.role);
-                    setActiveTab('dashboard');
-                    if (found.status === 'Pending') {
-                        triggerToast(`Session initialized. Account is pending approval.`, 'warning');
+            const handleLogin = async (email, password) => {
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ email, password }),
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        const userWithStatus = { ...data.user, status: data.user.status || 'Active' };
+                        setCurrentUser(userWithStatus);
+                        setStored('logged_in_user', userWithStatus);
+                        setStored('token', data.token);
+                        setViewRole(data.user.role);
+                        setStored('active_view_role', data.user.role);
+                        setActiveTab('dashboard');
+                        triggerToast(`Session authenticated successfully as ${data.user.name}.`);
                     } else {
-                        triggerToast(`Session authenticated successfully as ${found.name}.`);
+                        triggerToast(`Authentication failed: ${data.msg || 'Invalid credentials.'}`, 'error');
                     }
-                } else {
-                    triggerToast('Authentication failed: Invalid credentials.', 'error');
+                } catch (err) {
+                    console.error('Login error:', err);
+                    triggerToast('Network error: Unable to connect to authentication server.', 'error');
                 }
             };
 
-            const handleRegister = (name, email, password, role, department) => {
-                const usersList = getStored('users', INITIAL_USERS);
-                if (usersList.some(u => u.email === email)) {
-                    triggerToast('Register failed: Email address already registered.', 'error');
-                    return;
+            const handleRegister = async (name, email, password, role, department) => {
+                try {
+                    const response = await fetch('/api/auth/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ name, email, password, role, department }),
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        const userWithStatus = { ...data.user, status: data.user.status || 'Active' };
+                        // Add registered user locally so local cache knows it
+                        const usersList = getStored('users', INITIAL_USERS);
+                        const updated = [...usersList, { ...userWithStatus, password }];
+                        setStored('users', updated);
+                        
+                        setCurrentUser(userWithStatus);
+                        setStored('logged_in_user', userWithStatus);
+                        setStored('token', data.token);
+                        setViewRole(role);
+                        setStored('active_view_role', role);
+                        setActiveTab('dashboard');
+                        triggerToast(`Account onboarding finished: Welcome ${data.user.name}!`, 'success');
+                    } else {
+                        triggerToast(`Register failed: ${data.msg || 'Error registering account.'}`, 'error');
+                    }
+                } catch (err) {
+                    console.error('Registration error:', err);
+                    triggerToast('Network error: Unable to connect to registration server.', 'error');
                 }
-                const newUser = {
-                    id: `u-${Date.now()}`,
-                    name,
-                    email,
-                    password,
-                    role,
-                    department,
-                    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
-                    status: 'Pending'
-                };
-                const updated = [...usersList, newUser];
-                db.users = updated;
-                setStored('users', updated);
-                setCurrentUser(newUser);
-                setStored('logged_in_user', newUser);
-                setViewRole(role);
-                setStored('active_view_role', role);
-                setActiveTab('dashboard');
-                triggerToast(`Account onboarding finished: Welcome ${name}! Awaiting approval.`, 'warning');
             };
 
             const handleLogout = () => {
@@ -1086,75 +1079,88 @@
             const inventory = db.inventory;
             const workers = db.workers;
 
-            const flirtyLine = React.useMemo(() => {
-                const lines = [
-                    "Are you a CSS class? Because you've got style. 😉",
-                    "Are you a layout wrapper? Because you hold my whole page together. ❤️",
-                    "Are you a Git repository? Because I'd commit to you anytime. 💻",
-                    "Is your name Google? Because you have everything I've been searching for. ✨",
-                    "Are you a keyboard? Because you're just my type. ⌨️",
-                    "Are you a loop? Because I keep coming back to you. 🔄",
-                    "Are you a database query? Because you've selected all of my heart. 🗄️",
-                    "Is your server running hot, or are you just happy to see my commits? 🔥"
-                ];
-                return lines[Math.floor(Math.random() * lines.length)];
+            // Clean view initialization
+
+            const [pendingUsers, setPendingUsers] = React.useState([]);
+
+            const fetchPendingUsers = async () => {
+                try {
+                    const response = await fetch('/api/users');
+                    const data = await response.json();
+                    if (data.success) {
+                        const pending = data.data.filter(u => u.status === 'Pending');
+                        let filtered = [];
+                        if (user.role === 'Administrator') {
+                            filtered = pending.filter(u => u.role === 'Project Manager' || u.role === 'Client');
+                        } else if (user.role === 'Project Manager') {
+                            filtered = pending.filter(u => u.role === 'Site Engineer');
+                        } else if (user.role === 'Site Engineer') {
+                            filtered = pending.filter(u => u.role === 'Contractor');
+                        } else if (user.role === 'Contractor') {
+                            filtered = pending.filter(u => u.role === 'Worker');
+                        }
+                        setPendingUsers(filtered);
+                    }
+                } catch (err) {
+                    console.error('Error fetching users:', err);
+                }
+            };
+
+            React.useEffect(() => {
+                fetchPendingUsers();
             }, []);
 
-            // Get pending registration approvals managed by current user
-            const getPendingApprovals = () => {
-                const allUsers = getStored('users', INITIAL_USERS);
-                const pending = allUsers.filter(u => u.status === 'Pending');
-                if (user.role === 'Administrator') {
-                    return pending.filter(u => u.role === 'Project Manager' || u.role === 'Client');
+            const handleApproveUser = async (userId, userName) => {
+                try {
+                    const response = await fetch(`/api/users/${userId}/approve`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        // Add system alert about registration approval
+                        const newAlert = {
+                            id: `n-${Date.now()}`,
+                            type: 'Success',
+                            text: `User ${userName} request has been approved and activated.`,
+                            read: false,
+                            date: 'Just now'
+                        };
+                        db.notifications = [newAlert, ...db.notifications];
+                        setStored('notifications', db.notifications);
+
+                        setPendingUsers(pendingUsers.filter(u => u.id !== userId));
+                        triggerToast(`Approved registration for user "${userName}".`);
+                    } else {
+                        triggerToast(`Approval failed: ${data.msg || 'Error'}`, 'error');
+                    }
+                } catch (err) {
+                    console.error('Approval error:', err);
+                    triggerToast('Network error: Unable to approve user.', 'error');
                 }
-                if (user.role === 'Project Manager') {
-                    return pending.filter(u => u.role === 'Site Engineer');
-                }
-                if (user.role === 'Site Engineer') {
-                    return pending.filter(u => u.role === 'Contractor');
-                }
-                if (user.role === 'Contractor') {
-                    return pending.filter(u => u.role === 'Worker');
-                }
-                return [];
             };
 
-            const [pendingUsers, setPendingUsers] = React.useState(() => getPendingApprovals());
-
-            const handleApproveUser = (userId, userName) => {
-                const allUsers = getStored('users', INITIAL_USERS);
-                const updated = allUsers.map(u => {
-                    if (u.id === userId) return { ...u, status: 'Active' };
-                    return u;
-                });
-                db.users = updated;
-                setStored('users', updated);
-                syncDB();
-
-                // Add system alert about registration approval
-                const newAlert = {
-                    id: `n-${Date.now()}`,
-                    type: 'Success',
-                    text: `User ${userName} request has been approved and activated.`,
-                    read: false,
-                    date: 'Just now'
-                };
-                db.notifications = [newAlert, ...db.notifications];
-                setStored('notifications', db.notifications);
-
-                setPendingUsers(pendingUsers.filter(u => u.id !== userId));
-                triggerToast(`Approved registration for user "${userName}".`);
-            };
-
-            const handleDeclineUser = (userId, userName) => {
-                const allUsers = getStored('users', INITIAL_USERS);
-                const updated = allUsers.filter(u => u.id !== userId);
-                db.users = updated;
-                setStored('users', updated);
-                syncDB();
-
-                setPendingUsers(pendingUsers.filter(u => u.id !== userId));
-                triggerToast(`Declined registration for user "${userName}".`, 'warning');
+            const handleDeclineUser = async (userId, userName) => {
+                try {
+                    const response = await fetch(`/api/users/${userId}/decline`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        setPendingUsers(pendingUsers.filter(u => u.id !== userId));
+                        triggerToast(`Declined registration for user "${userName}".`, 'warning');
+                    } else {
+                        triggerToast(`Decline failed: ${data.msg || 'Error'}`, 'error');
+                    }
+                } catch (err) {
+                    console.error('Decline error:', err);
+                    triggerToast('Network error: Unable to decline user.', 'error');
+                }
             };
 
             // Math computations
@@ -1227,10 +1233,7 @@
                         <div>
                             <h2 className="text-2xl font-bold text-white">Welcome back, {user.name}!</h2>
                             <p className="text-slate-400 mt-1">Here is a unified monitoring snapshot for all construction operations.</p>
-                            <p className="text-amber-400 mt-2 text-xs font-semibold flex items-center gap-1.5 animate-pulse">
-                                <i data-lucide="heart" className="w-3.5 h-3.5 text-rose-500 fill-rose-500"></i>
-                                {flirtyLine}
-                            </p>
+                            {/* Flirty lines removed */}
                         </div>
                         <span className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 ${theme.badgeBg}`}>
                             <i data-lucide="shield-check" className="w-5 h-5"></i>
