@@ -1,0 +1,281 @@
+<!-- Navbar -->
+<nav class="navbar" [class.scrolled]="isScrolled">
+    <div class="nav-content">
+        <div class="logo">
+            <img src="https://placehold.co/150x42/transparent/191970?text=LOGO" alt="BuildTrack Logo"
+                style="height:42px; display:block;">
+        </div>
+
+        <div class="nav-links">
+            <div class="nav-indicator" [ngStyle]="indicatorStyle"></div>
+            <a href="#home" [class.active]="activeSection === 'home'" #navItem>Home</a>
+            <a href="#features" [class.active]="activeSection === 'features'" #navItem>Features</a>
+            <a href="#solutions" [class.active]="activeSection === 'solutions'" #navItem>Solutions</a>
+            <a href="#about" [class.active]="activeSection === 'about'" #navItem>About</a>
+            <a href="#contact" [class.active]="activeSection === 'contact'" #navItem>Contact</a>
+        </div>
+
+        <div class="nav-actions">
+            <div class="auth-capsule">
+                <button class="capsule-btn login">Login</button>
+                <div class="capsule-divider"></div>
+                <button class="capsule-btn register">Register</button>
+            </div>
+        </div>
+
+        <button class="mobile-menu-btn" (click)="toggleMobileMenu()">
+            <span class="icon-placeholder"
+                style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+        </button>
+    </div>
+</nav>
+
+<!-- Mobile Menu -->
+<div class="mobile-menu" *ngIf="isMobileMenuOpen" @fadeSlideUp>
+    <a href="#home" (click)="toggleMobileMenu()">Home</a>
+    <a href="#features" (click)="toggleMobileMenu()">Features</a>
+    <a href="#solutions" (click)="toggleMobileMenu()">Solutions</a>
+    <a href="#about" (click)="toggleMobileMenu()">About</a>
+    <a href="#contact" (click)="toggleMobileMenu()">Contact</a>
+    <div
+        style="display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: center; flex-direction: column; padding: 0 1rem; align-items: center;">
+        <div class="auth-capsule">
+            <button class="capsule-btn login">Login</button>
+            <div class="capsule-divider"></div>
+            <button class="capsule-btn register">Register</button>
+        </div>
+    </div>
+</div>
+
+<!-- Hero Section -->
+<section id="home" class="hero">
+    <div class="hero-content">
+        <div class="hero-typography-container">
+            <div class="typo-row-1">
+                <span class="typo-built">BUILT</span>
+                <span class="typo-to">to</span>
+            </div>
+            <div class="typo-row-2">
+                <span class="typo-build">BUILD</span>
+            </div>
+            <div class="typo-row-3">
+                <span class="typo-better">BETTER</span>
+            </div>
+        </div>
+
+        <p class="hero-description">
+            Empowering modern construction teams with real-time insights, seamless collaboration, and end-to-end project
+            visibility.
+        </p>
+
+        <div class="hero-cta">
+            <button class="btn-register-org">
+                Register Organization
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section id="features" class="section bg-muted">
+    <div class="container">
+        <div class="section-header">
+            <h2>Comprehensive Platform Features</h2>
+            <p>Everything you need to orchestrate complex construction projects from a single, unified enterprise
+                platform.</p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card" *ngFor="let feature of features">
+                <div class="icon-wrapper">
+                    <span class="icon-placeholder"
+                        style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                </div>
+                <h3>{{ feature.title }}</h3>
+                <p>{{ feature.description }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Platform Showcase Section -->
+<section id="solutions" class="section">
+    <div class="container">
+        <div class="section-header">
+            <h2>Built for the Modern Enterprise</h2>
+            <p>Experience a platform designed with uncompromising attention to detail, engineered to scale with your
+                most ambitious projects.</p>
+        </div>
+
+        <div class="showcase-container">
+            <div class="laptop-mockup">
+                <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1200&h=750"
+                    alt="Dashboard Mockup Desktop">
+            </div>
+            <div class="mobile-mockup">
+                <img src="https://images.unsplash.com/photo-1618761714954-0b8cd0026356?auto=format&fit=crop&q=80&w=600&h=1200"
+                    alt="Dashboard Mockup Mobile">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- About Section -->
+<section id="about" class="section about-section">
+    <div class="container">
+        <div class="about-grid">
+            <div class="about-content">
+                <h2 class="premium-heading">Pioneering the Future of Construction Management</h2>
+                <p class="subtitle">Built by engineers, for engineers.</p>
+                <p class="description">
+                    BuildTrack bridges the gap between the field and the office. We provide an enterprise-grade
+                    ecosystem that integrates seamlessly with your existing workflows, ensuring that your most critical
+                    projects are delivered on time and within budget.
+                </p>
+                <ul class="highlights-list">
+                    <li><span class="icon-placeholder highlight-icon"
+                            style="display:inline-block; width:20px; height:20px; background-color:var(--accent,#2563EB); border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                        Real-time synchronicity</li>
+                    <li><span class="icon-placeholder highlight-icon"
+                            style="display:inline-block; width:20px; height:20px; background-color:var(--accent,#2563EB); border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                        Uncompromising data security</li>
+                    <li><span class="icon-placeholder highlight-icon"
+                            style="display:inline-block; width:20px; height:20px; background-color:var(--accent,#2563EB); border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                        Seamless ERP integration</li>
+                </ul>
+            </div>
+            <div class="about-image">
+                <img src="https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&q=80&w=800&h=600"
+                    alt="Construction Engineering">
+                <div class="glass-overlay-card">
+                    <span class="stat-large">99.9%</span>
+                    <span class="stat-label">Uptime SLA</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Image Carousel Section -->
+<section class="carousel-section">
+    <div class="carousel-track">
+        <div class="carousel-slide" *ngFor="let img of carouselImages">
+            <img [src]="img" alt="Construction Progress">
+        </div>
+        <!-- Duplicate for infinite scroll effect -->
+        <div class="carousel-slide" *ngFor="let img of carouselImages">
+            <img [src]="img" alt="Construction Progress">
+        </div>
+    </div>
+</section>
+
+<!-- Trusted By Section -->
+<section class="trusted-by">
+    <div class="container">
+        <div class="section-header">
+            <h2>Trusted by Growing Construction Businesses</h2>
+            <p>Join the industry leaders who have modernized their operations with BuildTrack.</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-item" *ngFor="let stat of stats">
+                <div class="stat-value">{{ stat.value }}{{ stat.suffix }}</div>
+                <div class="stat-label">{{ stat.label }}</div>
+            </div>
+        </div>
+
+        <div class="logos-track">
+            <div class="logos-inner">
+                <!-- Abstract company logos using lucide icons as placeholders for SaaS design feel -->
+                <span class="icon-placeholder"
+                    style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                <span class="icon-placeholder"
+                    style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                <span class="icon-placeholder"
+                    style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                <span class="icon-placeholder"
+                    style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                <span class="icon-placeholder"
+                    style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                <!-- Duplicate for scroll -->
+                <span class="icon-placeholder"
+                    style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                <span class="icon-placeholder"
+                    style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                <span class="icon-placeholder"
+                    style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                <span class="icon-placeholder"
+                    style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+                <span class="icon-placeholder"
+                    style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section id="contact" class="cta-section">
+    <div class="cta-container">
+        <div class="cta-content">
+            <h2>Ready to Digitize Your Construction Operations?</h2>
+            <p>Join the thousands of professionals who have revolutionized their site management. Get started with
+                BuildTrack today.</p>
+            <button class="btn btn-accent btn-large">
+                Register Organization <span class="icon-placeholder"
+                    style="display:inline-block; width:20px; height:20px; background-color:#ccc; border-radius:50%; vertical-align:middle; margin-right:8px;"></span>
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <div class="logo">Build<span>Track</span></div>
+                <p>The AI-powered Construction Project Management & Site Monitoring Platform built for the modern
+                    enterprise.</p>
+            </div>
+
+            <div class="footer-links">
+                <h4>Solutions</h4>
+                <ul>
+                    <li><a href="#">Site Monitoring</a></li>
+                    <li><a href="#">Employee Management</a></li>
+                    <li><a href="#">Material Tracking</a></li>
+                    <li><a href="#">AI Analytics</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-links">
+                <h4>Resources</h4>
+                <ul>
+                    <li><a href="#">Documentation</a></li>
+                    <li><a href="#">API Reference</a></li>
+                    <li><a href="#">Case Studies</a></li>
+                    <li><a href="#">Help Center</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-links">
+                <h4>Company</h4>
+                <ul>
+                    <li><a href="#">About Us</a></li>
+                    <li><a href="#">Careers</a></li>
+                    <li><a href="#">Contact Support</a></li>
+                    <li><a href="#">Newsletter</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2026 BuildTrack. All rights reserved.</p>
+            <div class="legal-links">
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+                <a href="#">Cookie Policy</a>
+            </div>
+        </div>
+    </div>
+</footer>
