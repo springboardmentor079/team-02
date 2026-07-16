@@ -62,6 +62,18 @@ export class AuthService {
     this.currentUserSubject.next(null);
   }
 
+  forgotPassword(data: { mobile?: string; email?: string }): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/forgot-password`, data);
+  }
+
+  resetPassword(data: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/reset-password`, data);
+  }
+
+  sendOtpEmail(email: string, type: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/send-otp-email`, { email, type });
+  }
+
   hasRole(roles: string[]): boolean {
     const user = this.currentUserValue;
     if (!user) return false;

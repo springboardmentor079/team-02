@@ -38,8 +38,20 @@ export class ProjectService {
     return this.http.get<any>(`${this.apiUrl}/projects`);
   }
 
+  getProjectById(id: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/projects/${id}`);
+  }
+
   createProject(project: Project): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/projects`, project);
+  }
+
+  updateProject(id: string, project: Project): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/projects/${id}`, project);
+  }
+
+  deleteProject(id: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/projects/${id}`);
   }
 
   getMilestones(projectId: string): Observable<any> {
