@@ -24,6 +24,11 @@ const WorkerSchema = new mongoose.Schema({
     enum: ['Active', 'Inactive'],
     default: 'Active'
   },
+  currentProjectId: {
+    type: mongoose.Schema.ObjectId,
+    ref: 'Project',
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

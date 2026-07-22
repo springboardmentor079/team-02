@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { ProjectService, Project } from '../../services/project.service';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { ProjectService, Project, Milestone } from '../../services/project.service';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -128,7 +128,7 @@ import { CommonModule } from '@angular/common';
             <td>₹{{ formatCurrency(p.budget) }}</td>
             <td>
               <div style="display:flex;gap:8px">
-                <button class="action-btn detail-btn" title="View Details" (click)="viewDetails(p._id!)">👁️</button>
+                <button class="action-btn detail-btn" title="View Workspace" (click)="viewDetails(p._id!)">👁️ Details</button>
                 <button class="action-btn edit-btn" title="Edit" (click)="startEdit(p)">✏️</button>
                 <button class="action-btn delete-btn" title="Delete" (click)="confirmDelete(p._id!)">🗑️</button>
               </div>
@@ -141,63 +141,305 @@ import { CommonModule } from '@angular/common';
       </div>
     </div>
 
-    <!-- Project Details Modal -->
+    <!-- Project Workspace Details Modal -->
     <div class="modal-overlay" *ngIf="showDetails && selectedProject">
-      <div class="modal-card">
+      <div class="modal-card" style="max-width:850px; width:95%">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px">
-          <h3 style="font-size:18px;color:#fff;margin:0">Project Details</h3>
+          <div>
+            <h3 style="font-size:20px;color:#fff;margin:0">{{ selectedProject.name }}</h3>
+            <span class="badge" [ngClass]="getBadgeClass(selectedProject.status)" style="margin-top: 4px;">{{ selectedProject.status }}</span>
+          </div>
           <button (click)="showDetails=false" style="background:none;border:none;color:#a0a3b1;cursor:pointer;font-size:24px;padding:0;line-height:1">&times;</button>
         </div>
-        
-        <div class="detail-row">
-          <span class="detail-label">Name</span>
-          <span class="detail-value">{{ selectedProject.name }}</span>
+
+        <!-- Tab Headers -->
+        <div class="modal-tabs">
+          <button class="tab-btn" [class.active]="activeTab === 'overview'" (click)="activeTab = 'overview'">Overview</button>
+          <button class="tab-btn" [class.active]="activeTab === 'milestones'" (click)="activeTab = 'milestones'">Milestones Timeline</button>
+          <button class="tab-btn" [class.active]="activeTab === 'logs'" (click)="activeTab = 'logs'">Daily Site Logs</button>
+          <button class="tab-btn" [class.active]="activeTab === 'budget'" (click)="activeTab = 'budget'">Budgets & Costs</button>
         </div>
-        <div class="detail-row">
-          <span class="detail-label">Category</span>
-          <span class="detail-value">{{ selectedProject.category }}</span>
+
+        <!-- Tab contents: Overview -->
+        <div *ngIf="activeTab === 'overview'" class="tab-content" style="padding:10px 0">
+          <div class="overview-grid">
+            <div class="overview-info">
+              <div class="detail-row"><span class="detail-label">Category</span><span class="detail-value">{{ selectedProject.category }}</span></div>
+              <div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">{{ selectedProject.client }}</span></div>
+              <div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">{{ selectedProject.location }}</span></div>
+              <div class="detail-row"><span class="detail-label">Start Date</span><span class="detail-value">{{ selectedProject.startDate | date:'longDate' }}</span></div>
+              <div class="detail-row"><span class="detail-label">End Date</span><span class="detail-value">{{ selectedProject.endDate | date:'longDate' }}</span></div>
+              <div class="detail-row" *ngIf="selectedProject.projectManager"><span class="detail-label">Manager</span><span class="detail-value">{{ selectedProject.projectManager.name }}</span></div>
+            </div>
+            <div class="overview-stats">
+              <div class="overview-stat-box">
+                <span class="stat-lbl">Overall Progress</span>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+                  <div class="progress-bar" style="height:12px; flex:1">
+                    <div class="progress-fill" [style.width.%]="selectedProject.progress || 0"></div>
+                  </div>
+                  <span style="font-weight:700; color:#fff">{{ selectedProject.progress || 0 }}%</span>
+                </div>
+              </div>
+              <div class="overview-stat-box" style="margin-top:16px">
+                <span class="stat-lbl">Budget Spent Breakdown</span>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:#a0a3b1;margin-bottom:4px;margin-top:8px">
+                  <span>Expended: ₹{{ formatRealCurrency(selectedProject.actualExpense || 0) }}</span>
+                  <span>Total Budget: ₹{{ formatRealCurrency(selectedProject.budget) }}</span>
+                </div>
+                <div class="progress-bar" style="height:12px">
+                  <div class="progress-fill" [style.width.%]="getBudgetPercentage(selectedProject)" [style.background]="getBudgetBarColor(selectedProject)"></div>
+                </div>
+                <div style="text-align:right;font-size:12px;margin-top:4px" [style.color]="getBudgetBarColor(selectedProject)">
+                  {{ getBudgetPercentage(selectedProject).toFixed(1) }}% Consumed
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="detail-row">
-          <span class="detail-label">Client</span>
-          <span class="detail-value">{{ selectedProject.client }}</span>
+
+        <!-- Tab contents: Milestones -->
+        <div *ngIf="activeTab === 'milestones'" class="tab-content" style="padding:10px 0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h4 style="color:#fff;margin:0;font-size:15px">Timeline Checklist</h4>
+            <button class="btn btn-outline" style="padding:6px 12px;font-size:12px" (click)="toggleMilestoneForm()">
+              {{ showMilestoneForm ? 'Cancel' : '+ Add Milestone' }}
+            </button>
+          </div>
+
+          <!-- Inline Milestone Form -->
+          <div class="glass-card" *ngIf="showMilestoneForm" style="padding:16px;margin-bottom:16px">
+            <form [formGroup]="milestoneForm" (ngSubmit)="addMilestone()">
+              <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                <div class="field-group">
+                  <label>Title *</label>
+                  <input formControlName="title" placeholder="e.g. Pour foundation walls" class="input-field" style="padding:8px 12px">
+                </div>
+                <div class="field-group">
+                  <label>Phase *</label>
+                  <select formControlName="phase" class="input-field" style="padding:8px 12px">
+                    <option value="Foundation">Foundation</option>
+                    <option value="Structural Work">Structural Work</option>
+                    <option value="Electrical Work">Electrical Work</option>
+                    <option value="Plumbing Work">Plumbing Work</option>
+                    <option value="Finishing Work">Finishing Work</option>
+                    <option value="Inspection Work">Inspection Work</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label>Due Date *</label>
+                  <input type="date" formControlName="dueDate" class="input-field" style="padding:8px 12px">
+                </div>
+                <div class="field-group">
+                  <label>Status *</label>
+                  <select formControlName="status" class="input-field" style="padding:8px 12px">
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
+              </div>
+              <div style="text-align:right">
+                <button type="submit" class="btn btn-primary" style="padding:6px 16px;font-size:12px" [disabled]="milestoneForm.invalid || milestoneSaving">
+                  {{ milestoneSaving ? 'Adding...' : 'Add Milestone' }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Milestones List -->
+          <div class="mini-table-container" style="max-height:280px;overflow-y:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Milestone Title</th>
+                  <th>Phase</th>
+                  <th>Due Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let m of milestones">
+                  <td style="width:150px">
+                    <select [value]="m.status" (change)="updateMilestoneStatus(m._id!, $event)" class="select-status-badge" [ngClass]="getMilestoneStatusClass(m.status)">
+                      <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                  </td>
+                  <td>
+                    <span [style.text-decoration]="m.status === 'Completed' ? 'line-through' : 'none'" [style.color]="m.status === 'Completed' ? '#6b6f82' : '#fff'">
+                      {{ m.title }}
+                    </span>
+                  </td>
+                  <td><span class="badge badge-info" style="font-size:10px">{{ m.phase }}</span></td>
+                  <td>{{ m.dueDate | date:'mediumDate' }}</td>
+                  <td style="width:60px;text-align:center">
+                    <button (click)="deleteMilestone(m._id!)" style="background:none;border:none;color:#FF6B6B;cursor:pointer;font-size:15px" title="Delete">🗑️</button>
+                  </td>
+                </tr>
+                <tr *ngIf="milestones.length === 0">
+                  <td colspan="5" style="text-align:center;color:#6b6f82;padding:24px">No milestones logged for this project.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="detail-row">
-          <span class="detail-label">Location</span>
-          <span class="detail-value">{{ selectedProject.location }}</span>
+
+        <!-- Tab contents: Daily Activity Logs -->
+        <div *ngIf="activeTab === 'logs'" class="tab-content" style="padding:10px 0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h4 style="color:#fff;margin:0;font-size:15px">Site Activity Logs</h4>
+            <button class="btn btn-outline" style="padding:6px 12px;font-size:12px" (click)="toggleLogForm()">
+              {{ showLogForm ? 'Cancel' : '+ New Entry' }}
+            </button>
+          </div>
+
+          <!-- Inline Daily Log Form -->
+          <div class="glass-card" *ngIf="showLogForm" style="padding:16px;margin-bottom:16px">
+            <form [formGroup]="logForm" (ngSubmit)="addDailyLog()">
+              <div class="field-group" style="margin-bottom:12px">
+                <label>Work Description *</label>
+                <textarea formControlName="workCompleted" placeholder="Brief detail about construction work performed today..." class="input-field" style="padding:8px 12px;height:55px;resize:none"></textarea>
+              </div>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                <div class="field-group">
+                  <label>Delay Time (Hours)</label>
+                  <input type="number" formControlName="delayTime" class="input-field" style="padding:8px 12px">
+                </div>
+                <div class="field-group">
+                  <label>Delay Reason (If applicable)</label>
+                  <input formControlName="delayReason" placeholder="Weather, concrete truck late, etc." class="input-field" style="padding:8px 12px">
+                </div>
+              </div>
+              <div style="text-align:right">
+                <button type="submit" class="btn btn-primary" style="padding:6px 16px;font-size:12px" [disabled]="logForm.invalid || logSaving">
+                  {{ logSaving ? 'Saving...' : 'Submit Log' }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Logs List -->
+          <div class="mini-table-container" style="max-height:280px;overflow-y:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Work Completed</th>
+                  <th>Delay (Hrs)</th>
+                  <th>Delay Reason</th>
+                  <th>Supervisor</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let l of progressLogs">
+                  <td style="white-space:nowrap">{{ l.date | date:'shortDate' }}</td>
+                  <td><span style="color:#fff;font-size:13px">{{ l.workCompleted }}</span></td>
+                  <td>{{ l.delayTime }} hrs</td>
+                  <td>
+                    <span class="badge" [ngClass]="l.delayTime > 0 ? 'badge-danger' : 'badge-success'">
+                      {{ l.delayReason || 'None' }}
+                    </span>
+                  </td>
+                  <td>{{ l.supervisorId?.name || 'Site Engineer' }}</td>
+                </tr>
+                <tr *ngIf="progressLogs.length === 0">
+                  <td colspan="5" style="text-align:center;color:#6b6f82;padding:24px">No activity logs recorded.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="detail-row">
-          <span class="detail-label">Status</span>
-          <span class="detail-value">
-            <span class="badge" [ngClass]="getBadgeClass(selectedProject.status)">{{ selectedProject.status }}</span>
-          </span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Progress</span>
-          <span class="detail-value">{{ selectedProject.progress || 0 }}%</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Budget</span>
-          <span class="detail-value">₹{{ formatCurrency(selectedProject.budget) }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Actual Expense</span>
-          <span class="detail-value">₹{{ formatCurrency(selectedProject.actualExpense) }}</span>
-        </div>
-        <div class="detail-row" *ngIf="selectedProject.projectManager">
-          <span class="detail-label">Project Manager</span>
-          <span class="detail-value">{{ selectedProject.projectManager.name }} ({{ selectedProject.projectManager.email }})</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Start Date</span>
-          <span class="detail-value">{{ selectedProject.startDate | date:'longDate' }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">End Date</span>
-          <span class="detail-value">{{ selectedProject.endDate | date:'longDate' }}</span>
+
+        <!-- Tab contents: Budgets & Expenditures -->
+        <div *ngIf="activeTab === 'budget'" class="tab-content" style="padding:10px 0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h4 style="color:#fff;margin:0;font-size:15px">Budget Categories</h4>
+            <button class="btn btn-outline" style="padding:6px 12px;font-size:12px" (click)="toggleBudgetForm()">
+              {{ showBudgetForm ? 'Cancel' : '+ Allocate Category' }}
+            </button>
+          </div>
+
+          <!-- Inline Budget Category Form -->
+          <div class="glass-card" *ngIf="showBudgetForm" style="padding:16px;margin-bottom:16px">
+            <form [formGroup]="budgetForm" (ngSubmit)="addBudgetCategory()">
+              <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+                <div class="field-group">
+                  <label>Category *</label>
+                  <select formControlName="category" class="input-field" style="padding:8px 12px">
+                    <option value="Labor Cost">Labor Cost</option>
+                    <option value="Material Cost">Material Cost</option>
+                    <option value="Equipment Cost">Equipment Cost</option>
+                    <option value="Transportation Cost">Transportation Cost</option>
+                    <option value="Maintenance Cost">Maintenance Cost</option>
+                    <option value="Administrative Cost">Administrative Cost</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label>Allocated (₹) *</label>
+                  <input type="number" formControlName="allocated" class="input-field" style="padding:8px 12px">
+                </div>
+                <div class="field-group">
+                  <label>Actual (₹)</label>
+                  <input type="number" formControlName="actual" class="input-field" style="padding:8px 12px">
+                </div>
+              </div>
+              <div style="text-align:right">
+                <button type="submit" class="btn btn-primary" style="padding:6px 16px;font-size:12px" [disabled]="budgetForm.invalid || budgetSaving">
+                  {{ budgetSaving ? 'Saving...' : 'Add Category' }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Budgets List -->
+          <div class="mini-table-container" style="max-height:280px;overflow-y:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cost Category</th>
+                  <th>Allocated</th>
+                  <th>Actual Expended</th>
+                  <th>Utilization</th>
+                  <th style="text-align:center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let b of budgets">
+                  <td><strong style="color:#fff">{{ b.category }}</strong></td>
+                  <td>₹{{ formatRealCurrency(b.allocated) }}</td>
+                  <td [style.color]="b.actual > b.allocated ? '#FF6B6B' : '#00BFA5'">
+                    ₹{{ formatRealCurrency(b.actual) }}
+                  </td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <div class="progress-bar" style="height:6px;width:75px;background:rgba(255,255,255,0.05)">
+                        <div class="progress-fill" [style.width.%]="getBudgetCategoryRatio(b)" [style.background]="b.actual > b.allocated ? '#FF6B6B' : '#00BFA5'"></div>
+                      </div>
+                      <span style="font-size:12px;font-weight:600" [style.color]="b.actual > b.allocated ? '#FF6B6B' : '#a0a3b1'">
+                        {{ getBudgetCategoryRatio(b).toFixed(0) }}%
+                      </span>
+                    </div>
+                  </td>
+                  <td style="text-align:center">
+                    <div style="display:flex;gap:12px;justify-content:center">
+                      <button (click)="incrementExpense(b)" style="background:none;border:none;color:#00BFA5;cursor:pointer;font-size:14px" title="Log Expense">💸 Log Exp</button>
+                      <button (click)="deleteBudgetCategory(b._id!)" style="background:none;border:none;color:#FF6B6B;cursor:pointer;font-size:15px" title="Delete">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr *ngIf="budgets.length === 0">
+                  <td colspan="5" style="text-align:center;color:#6b6f82;padding:24px">No budget limits allocated yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div style="margin-top:24px;text-align:right">
-          <button class="btn btn-primary" (click)="showDetails=false">Close Details</button>
+          <button class="btn btn-primary" (click)="showDetails=false">Close Workspace</button>
         </div>
       </div>
     </div>
@@ -228,7 +470,7 @@ import { CommonModule } from '@angular/common';
       color: #fff; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;
     }
     .input-field:focus { border-color: #6C63FF; }
-    .input-field option { background: #1a1d2e; }
+    .input-field option { background: #1a1d2e; color: #fff; }
     .loading-state, .empty-state { padding: 40px; text-align: center; color: #6b6f82; }
     .progress-wrap { display: flex; align-items: center; gap: 10px; }
     .progress-bar { flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
@@ -242,7 +484,7 @@ import { CommonModule } from '@angular/common';
       border-radius: 6px;
       color: #fff;
       padding: 6px 10px;
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer;
       transition: all 0.2s;
       display: flex;
@@ -277,7 +519,6 @@ import { CommonModule } from '@angular/common';
     }
     .modal-card {
       width: 100%;
-      max-width: 550px;
       background: #111422;
       border: 1px solid rgba(255,255,255,0.1);
       border-radius: 16px;
@@ -314,6 +555,80 @@ import { CommonModule } from '@angular/common';
       background: #6C63FF;
       cursor: pointer;
     }
+
+    /* Modal Workspace Tabs Styling */
+    .modal-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 8px;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: #a0a3b1;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
+      outline: none;
+    }
+    .tab-btn:hover {
+      color: #fff;
+    }
+    .tab-btn.active {
+      color: #6C63FF;
+      border-bottom-color: #6C63FF;
+      font-weight: 600;
+    }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .overview-info {
+      display: flex;
+      flex-direction: column;
+    }
+    .overview-stats {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .overview-stat-box {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    .stat-lbl {
+      font-size: 11px;
+      font-weight: 600;
+      color: #a0a3b1;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .mini-table-container {
+      background: rgba(255,255,255,0.01);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px;
+    }
+    .select-status-badge {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 12px;
+      padding: 4px 8px;
+      outline: none;
+      cursor: pointer;
+    }
+    .status-pending { color: #ffc107; border-color: rgba(255,193,7,0.3); }
+    .status-inprogress { color: #6C63FF; border-color: rgba(108,99,255,0.3); }
+    .status-completed { color: #00BFA5; border-color: rgba(0,191,165,0.3); }
   `]
 })
 export class ProjectsComponent implements OnInit {
@@ -331,6 +646,27 @@ export class ProjectsComponent implements OnInit {
   isEditing = false;
   editingProjectId = '';
 
+  // Workspace subcomponents state
+  activeTab = 'overview';
+  milestones: Milestone[] = [];
+  progressLogs: any[] = [];
+  budgets: any[] = [];
+
+  // Sub-forms
+  milestoneForm: FormGroup;
+  showMilestoneForm = false;
+  milestoneSaving = false;
+
+  logForm: FormGroup;
+  showLogForm = false;
+  logSaving = false;
+
+  budgetForm: FormGroup;
+  showBudgetForm = false;
+  budgetSaving = false;
+
+  Math = Math;
+
   constructor(private projectService: ProjectService, private fb: FormBuilder) {
     this.projectForm = this.fb.group({
       name: ['', Validators.required],
@@ -343,6 +679,25 @@ export class ProjectsComponent implements OnInit {
       endDate: ['', Validators.required],
       progress: [0],
       actualExpense: [0]
+    });
+
+    this.milestoneForm = this.fb.group({
+      title: ['', Validators.required],
+      phase: ['Foundation', Validators.required],
+      dueDate: ['', Validators.required],
+      status: ['Pending', Validators.required]
+    });
+
+    this.logForm = this.fb.group({
+      workCompleted: ['', Validators.required],
+      delayTime: [0, [Validators.required, Validators.min(0)]],
+      delayReason: ['None']
+    });
+
+    this.budgetForm = this.fb.group({
+      category: ['Labor Cost', Validators.required],
+      allocated: [0, [Validators.required, Validators.min(1)]],
+      actual: [0]
     });
   }
 
@@ -384,7 +739,6 @@ export class ProjectsComponent implements OnInit {
     this.editingProjectId = project._id || '';
     this.showForm = true;
     
-    // Format dates correctly for <input type="date"> (YYYY-MM-DD)
     const formatForInput = (dateVal: any) => {
       if (!dateVal) return '';
       const d = new Date(dateVal);
@@ -450,10 +804,40 @@ export class ProjectsComponent implements OnInit {
         if (res.success) {
           this.selectedProject = res.data;
           this.showDetails = true;
+          this.activeTab = 'overview';
+          
+          this.showMilestoneForm = false;
+          this.showLogForm = false;
+          this.showBudgetForm = false;
+          
+          this.loadProjectDetails(id);
         }
       },
       error: (err) => {
         console.error('Failed to load project details:', err);
+      }
+    });
+  }
+
+  loadProjectDetails(projectId: string) {
+    // Milestones
+    this.projectService.getMilestones(projectId).subscribe({
+      next: (res) => {
+        this.milestones = res.success ? res.data : [];
+      }
+    });
+
+    // Daily activity logs
+    this.projectService.getProjectProgressLogs(projectId).subscribe({
+      next: (res) => {
+        this.progressLogs = res.success ? res.data : [];
+      }
+    });
+
+    // Budgets breakdown
+    this.projectService.getProjectBudgets(projectId).subscribe({
+      next: (res) => {
+        this.budgets = res.success ? res.data : [];
       }
     });
   }
@@ -481,8 +865,8 @@ export class ProjectsComponent implements OnInit {
   getBadgeClass(status: string): string {
     const map: Record<string, string> = {
       'ongoing': 'badge-info',
-      'planning': 'badge-info',
-      'delayed': 'badge-warning',
+      'planning': 'badge-warning',
+      'delayed': 'badge-danger',
       'completed': 'badge-success',
       'closed': 'badge-danger',
     };
@@ -493,6 +877,209 @@ export class ProjectsComponent implements OnInit {
     if (!val) return '0';
     if (val >= 10000000) return (val / 10000000).toFixed(1) + 'Cr';
     if (val >= 100000) return (val / 100000).toFixed(1) + 'L';
-    return val.toLocaleString();
+    return val.toLocaleString('en-IN');
+  }
+
+  formatRealCurrency(val: number): string {
+    return (val || 0).toLocaleString('en-IN');
+  }
+
+  // --- Budget calculation helpers ---
+  getBudgetPercentage(project: any): number {
+    if (!project || !project.budget) return 0;
+    return ((project.actualExpense || 0) / project.budget) * 100;
+  }
+
+  getBudgetBarColor(project: any): string {
+    const percentage = this.getBudgetPercentage(project);
+    if (percentage > 100) return '#FF6B6B'; // Red overflow
+    if (percentage > 85) return '#ffc107'; // Warning yellow
+    return '#00BFA5'; // Healthy green
+  }
+
+  getBudgetCategoryRatio(budget: any): number {
+    if (!budget || !budget.allocated) return 0;
+    return (budget.actual / budget.allocated) * 100;
+  }
+
+  // --- Subcomponent form toggles ---
+  toggleMilestoneForm() {
+    this.showMilestoneForm = !this.showMilestoneForm;
+    if (this.showMilestoneForm) {
+      this.milestoneForm.reset({ status: 'Pending', phase: 'Foundation' });
+    }
+  }
+
+  toggleLogForm() {
+    this.showLogForm = !this.showLogForm;
+    if (this.showLogForm) {
+      this.logForm.reset({ delayTime: 0, delayReason: 'None' });
+    }
+  }
+
+  toggleBudgetForm() {
+    this.showBudgetForm = !this.showBudgetForm;
+    if (this.showBudgetForm) {
+      this.budgetForm.reset({ category: 'Labor Cost', allocated: 0, actual: 0 });
+    }
+  }
+
+  // --- Subcomponent API actions ---
+  
+  // Milestones CRUD
+  getMilestoneStatusClass(status: string): string {
+    const map: Record<string, string> = {
+      'pending': 'status-pending',
+      'in progress': 'status-inprogress',
+      'completed': 'status-completed'
+    };
+    return map[status?.toLowerCase()] || 'status-pending';
+  }
+
+  addMilestone() {
+    if (this.milestoneForm.invalid) return;
+    this.milestoneSaving = true;
+    
+    this.projectService.createMilestone(this.selectedProject._id, this.milestoneForm.value).subscribe({
+      next: () => {
+        this.milestoneSaving = false;
+        this.showMilestoneForm = false;
+        this.milestoneForm.reset({ status: 'Pending', phase: 'Foundation' });
+        
+        // Reload details & project card to reflect progress changes
+        this.loadProjectDetails(this.selectedProject._id);
+        this.syncProjectOverallInfo();
+      },
+      error: (err) => {
+        this.milestoneSaving = false;
+        alert(err?.error?.message || 'Failed to add milestone.');
+      }
+    });
+  }
+
+  updateMilestoneStatus(milestoneId: string, event: any) {
+    const newStatus = event.target.value;
+    this.projectService.updateMilestone(milestoneId, { status: newStatus }).subscribe({
+      next: () => {
+        this.loadProjectDetails(this.selectedProject._id);
+        this.syncProjectOverallInfo();
+      },
+      error: (err) => {
+        alert(err?.error?.message || 'Failed to update milestone status.');
+      }
+    });
+  }
+
+  deleteMilestone(milestoneId: string) {
+    if (!confirm('Are you sure you want to delete this milestone?')) return;
+    this.projectService.deleteMilestone(milestoneId).subscribe({
+      next: () => {
+        this.loadProjectDetails(this.selectedProject._id);
+        this.syncProjectOverallInfo();
+      },
+      error: (err) => {
+        alert(err?.error?.message || 'Failed to delete milestone.');
+      }
+    });
+  }
+
+  // Daily Site Logs Actions
+  addDailyLog() {
+    if (this.logForm.invalid) return;
+    this.logSaving = true;
+
+    // Supervisor mock fallback - in real deployment, it will be the logged in user
+    const localUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    const supervisorId = localUser.id || '6659c9b68e0d5d21a8a25c11'; // seeded Admin/PM id fallback
+    
+    const payload = {
+      ...this.logForm.value,
+      projectId: this.selectedProject._id,
+      supervisorId
+    };
+
+    this.projectService.logDailyProgress(payload).subscribe({
+      next: () => {
+        this.logSaving = false;
+        this.showLogForm = false;
+        this.logForm.reset({ delayTime: 0, delayReason: 'None' });
+        this.loadProjectDetails(this.selectedProject._id);
+      },
+      error: (err) => {
+        this.logSaving = false;
+        alert(err?.error?.message || 'Failed to add daily log.');
+      }
+    });
+  }
+
+  // Budget Breakdown Actions
+  addBudgetCategory() {
+    if (this.budgetForm.invalid) return;
+    this.budgetSaving = true;
+
+    this.projectService.createProjectBudget(this.selectedProject._id, this.budgetForm.value).subscribe({
+      next: () => {
+        this.budgetSaving = false;
+        this.showBudgetForm = false;
+        this.budgetForm.reset({ category: 'Labor Cost', allocated: 0, actual: 0 });
+        this.loadProjectDetails(this.selectedProject._id);
+      },
+      error: (err) => {
+        this.budgetSaving = false;
+        alert(err?.error?.message || 'Failed to add budget category.');
+      }
+    });
+  }
+
+  deleteBudgetCategory(budgetId: string) {
+    if (!confirm('Are you sure you want to delete this budget category?')) return;
+    this.projectService.deleteBudget(budgetId).subscribe({
+      next: () => {
+        this.loadProjectDetails(this.selectedProject._id);
+      },
+      error: (err) => {
+        alert(err?.error?.message || 'Failed to delete budget category.');
+      }
+    });
+  }
+
+  incrementExpense(budget: any) {
+    const amtStr = window.prompt(`Enter amount to add under ${budget.category} (₹):`);
+    if (!amtStr) return;
+    const amount = parseFloat(amtStr);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid positive number.');
+      return;
+    }
+
+    const updatedActual = (budget.actual || 0) + amount;
+    this.projectService.updateBudget(budget._id, { actual: updatedActual }).subscribe({
+      next: () => {
+        // Also update project's overall actualExpense
+        const newProjectExpense = (this.selectedProject.actualExpense || 0) + amount;
+        this.projectService.updateProject(this.selectedProject._id, { actualExpense: newProjectExpense }).subscribe({
+          next: (projRes) => {
+            this.selectedProject = projRes.data;
+            this.loadProjectDetails(this.selectedProject._id);
+            this.loadProjects(); // Reload primary grid
+          }
+        });
+      },
+      error: (err) => {
+        alert(err?.error?.message || 'Failed to record expense.');
+      }
+    });
+  }
+
+  // Reload project metadata internally to sync progress & budgets on the card
+  syncProjectOverallInfo() {
+    this.projectService.getProjectById(this.selectedProject._id).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.selectedProject = res.data;
+          this.loadProjects();
+        }
+      }
+    });
   }
 }

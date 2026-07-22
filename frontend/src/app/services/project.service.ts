@@ -30,7 +30,7 @@ export interface Milestone {
   providedIn: 'root'
 })
 export class ProjectService {
-  private apiUrl = 'http://localhost:5000/api';
+  private apiUrl = '/api';
 
   constructor(private http: HttpClient) {}
 
@@ -46,7 +46,7 @@ export class ProjectService {
     return this.http.post<any>(`${this.apiUrl}/projects`, project);
   }
 
-  updateProject(id: string, project: Project): Observable<any> {
+  updateProject(id: string, project: Partial<Project>): Observable<any> {
     return this.http.put<any>(`${this.apiUrl}/projects/${id}`, project);
   }
 
@@ -62,11 +62,39 @@ export class ProjectService {
     return this.http.post<any>(`${this.apiUrl}/projects/${projectId}/milestones`, milestone);
   }
 
+  updateMilestone(milestoneId: string, milestone: Partial<Milestone>): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/milestones/${milestoneId}`, milestone);
+  }
+
+  deleteMilestone(milestoneId: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/milestones/${milestoneId}`);
+  }
+
   logDailyProgress(logData: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/progress-logs`, logData);
   }
 
   getProgressLogs(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/progress-logs`);
+  }
+
+  getProjectProgressLogs(projectId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/projects/${projectId}/progress-logs`);
+  }
+
+  getProjectBudgets(projectId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/projects/${projectId}/budgets`);
+  }
+
+  createProjectBudget(projectId: string, budget: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/projects/${projectId}/budgets`, budget);
+  }
+
+  updateBudget(budgetId: string, budget: any): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/budgets/${budgetId}`, budget);
+  }
+
+  deleteBudget(budgetId: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/budgets/${budgetId}`);
   }
 }

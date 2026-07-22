@@ -27,6 +27,8 @@ import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { ProjectsComponent } from './components/projects/projects.component';
 import { ResourcesComponent } from './components/resources/resources.component';
 import { InventoryComponent } from './components/inventory/inventory.component';
+import { AttendanceComponent } from './components/attendance/attendance.component';
+import { ProcurementComponent } from './components/procurement/procurement.component';
 
 // Services & Guards
 import { AuthService } from './services/auth.service';
@@ -42,7 +44,9 @@ import { AuthGuard } from './guards/auth.guard';
     DashboardComponent,
     ProjectsComponent,
     ResourcesComponent,
-    InventoryComponent
+    InventoryComponent,
+    AttendanceComponent,
+    ProcurementComponent
   ],
   imports: [
     BrowserModule,

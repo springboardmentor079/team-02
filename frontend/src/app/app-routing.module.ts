@@ -8,6 +8,8 @@ import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { ProjectsComponent } from './components/projects/projects.component';
 import { ResourcesComponent } from './components/resources/resources.component';
 import { InventoryComponent } from './components/inventory/inventory.component';
+import { AttendanceComponent } from './components/attendance/attendance.component';
+import { ProcurementComponent } from './components/procurement/procurement.component';
 import { AuthGuard } from './guards/auth.guard';
 
 const routes: Routes = [
@@ -31,6 +33,16 @@ const routes: Routes = [
   { 
     path: 'inventory', 
     component: InventoryComponent, 
+    canActivate: [AuthGuard] 
+  },
+  { 
+    path: 'attendance', 
+    component: AttendanceComponent, 
+    canActivate: [AuthGuard] 
+  },
+  { 
+    path: 'procurement', 
+    component: ProcurementComponent, 
     canActivate: [AuthGuard] 
   },
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },

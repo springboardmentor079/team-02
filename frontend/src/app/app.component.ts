@@ -107,7 +107,9 @@ export class AppComponent {
     { label: 'Overview', icon: 'dashboard', link: '/dashboard', roles: ['Administrator', 'Project Manager', 'Site Engineer', 'Contractor', 'Client'] },
     { label: 'Projects', icon: 'business', link: '/projects', roles: ['Administrator', 'Project Manager', 'Site Engineer', 'Client'] },
     { label: 'Resources', icon: 'people', link: '/resources', roles: ['Administrator', 'Project Manager', 'Site Engineer'] },
-    { label: 'Inventory', icon: 'inventory_2', link: '/inventory', roles: ['Administrator', 'Project Manager', 'Contractor'] }
+    { label: 'Inventory', icon: 'inventory_2', link: '/inventory', roles: ['Administrator', 'Project Manager', 'Contractor'] },
+    { label: 'Attendance', icon: 'assignment_turned_in', link: '/attendance', roles: ['Administrator', 'Project Manager', 'Site Engineer', 'Contractor'] },
+    { label: 'Procurement', icon: 'shopping_cart', link: '/procurement', roles: ['Administrator', 'Project Manager', 'Contractor'] }
   ];
 
   constructor(private authService: AuthService, private router: Router) {}

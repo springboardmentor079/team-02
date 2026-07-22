@@ -150,7 +150,17 @@ app.use(express.json());
 app.use(cors());
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('dev'));
-app.use(express.static(path.join(__dirname, '../')));
+app.use(express.static(path.join(__dirname, '..')));
+
+const { protect } = require('./middleware/auth');
+
+// Protect all API endpoints except authentication and health checks
+app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/auth') || req.path === '/health') {
+    return next();
+  }
+  protect(req, res, next);
+});
 
 // Simple testing ping endpoint
 app.get('/api/health', (req, res) => {
@@ -596,10 +606,29 @@ app.get('/api/inventory', async (req, res) => {
   }
 });
 
+app.post('/api/inventory', async (req, res) => {
+  try {
+    const item = await Inventory.create(req.body);
+    res.status(201).json({ success: true, data: item });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.put('/api/inventory/:id', async (req, res) => {
   try {
-    const item = await Inventory.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const item = await Inventory.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     res.status(200).json({ success: true, data: item });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/inventory/:id', async (req, res) => {
+  try {
+    const item = await Inventory.findByIdAndDelete(req.params.id);
+    if (!item) return res.status(404).json({ success: false, msg: 'Material not found' });
+    res.status(200).json({ success: true, data: {}, msg: 'Material successfully deleted' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -608,7 +637,7 @@ app.put('/api/inventory/:id', async (req, res) => {
 // 6. WORKFORCE MANAGEMENT
 app.get('/api/workers', async (req, res) => {
   try {
-    const workers = await Worker.find();
+    const workers = await Worker.find().populate('currentProjectId', 'name');
     res.status(200).json({ success: true, count: workers.length, data: workers });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -624,10 +653,65 @@ app.post('/api/workers', async (req, res) => {
   }
 });
 
+app.get('/api/attendance', async (req, res) => {
+  try {
+    const { date } = req.query;
+    let query = {};
+    if (date) {
+      const searchDate = new Date(date);
+      const startOfDay = new Date(searchDate.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(searchDate.setHours(23, 59, 59, 999));
+      query.date = { $gte: startOfDay, $lte: endOfDay };
+    }
+    const attendance = await Attendance.find(query).populate('presentWorkers');
+    res.status(200).json({ success: true, count: attendance.length, data: attendance });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/attendance', async (req, res) => {
   try {
-    const attendance = await Attendance.create(req.body);
-    res.status(201).json({ success: true, data: attendance });
+    const { date, presentWorkers } = req.body;
+    if (!date) {
+      return res.status(400).json({ success: false, msg: 'Please provide a date' });
+    }
+    const searchDate = new Date(date);
+    const startOfDay = new Date(searchDate.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(searchDate.setHours(23, 59, 59, 999));
+    
+    let attendance = await Attendance.findOne({
+      date: { $gte: startOfDay, $lte: endOfDay }
+    });
+    
+    if (attendance) {
+      attendance.presentWorkers = presentWorkers;
+      await attendance.save();
+    } else {
+      attendance = await Attendance.create({ date, presentWorkers });
+    }
+    
+    res.status(200).json({ success: true, data: attendance });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/attendance', async (req, res) => {
+  try {
+    const { date } = req.query;
+    if (!date) {
+      return res.status(400).json({ success: false, msg: 'Please provide a date' });
+    }
+    const searchDate = new Date(date);
+    const startOfDay = new Date(searchDate.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(searchDate.setHours(23, 59, 59, 999));
+    
+    await Attendance.deleteOne({
+      date: { $gte: startOfDay, $lte: endOfDay }
+    });
+    
+    res.status(200).json({ success: true, msg: 'Attendance cleared successfully' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -647,6 +731,29 @@ app.post('/api/procurements', async (req, res) => {
   try {
     const po = await Procurement.create(req.body);
     res.status(201).json({ success: true, data: po });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/procurements/:id', async (req, res) => {
+  try {
+    const po = await Procurement.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    });
+    if (!po) return res.status(404).json({ success: false, msg: 'Purchase order not found' });
+    res.status(200).json({ success: true, data: po });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/procurements/:id', async (req, res) => {
+  try {
+    const po = await Procurement.findByIdAndDelete(req.params.id);
+    if (!po) return res.status(404).json({ success: false, msg: 'Purchase order not found' });
+    res.status(200).json({ success: true, msg: 'Purchase order deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -672,6 +779,180 @@ app.post('/api/projects/:projectId/budgets', async (req, res) => {
   }
 });
 
+// Extra Milestone 2 Endpoints
+
+// 9. MILESTONES UPDATES
+app.put('/api/milestones/:id', async (req, res) => {
+  try {
+    if (req.body.status === 'Completed' && !req.body.actualCompletionDate) {
+      req.body.actualCompletionDate = new Date();
+    } else if (req.body.status && req.body.status !== 'Completed') {
+      req.body.actualCompletionDate = null;
+    }
+    const milestone = await Milestone.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    });
+    if (!milestone) return res.status(404).json({ success: false, msg: 'Milestone not found' });
+    
+    // Proactively recalculate project progress if status changed
+    if (req.body.status && milestone.projectId) {
+      const allMilestones = await Milestone.find({ projectId: milestone.projectId });
+      if (allMilestones.length > 0) {
+        const completedCount = allMilestones.filter(m => m.status === 'Completed').length;
+        const progress = Math.round((completedCount / allMilestones.length) * 100);
+        await Project.findByIdAndUpdate(milestone.projectId, { progress });
+      }
+    }
+    
+    res.status(200).json({ success: true, data: milestone });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/milestones/:id', async (req, res) => {
+  try {
+    const milestone = await Milestone.findById(req.params.id);
+    if (!milestone) return res.status(404).json({ success: false, msg: 'Milestone not found' });
+    const projectId = milestone.projectId;
+    await Milestone.findByIdAndDelete(req.params.id);
+    
+    // Proactively recalculate project progress
+    if (projectId) {
+      const allMilestones = await Milestone.find({ projectId });
+      const completedCount = allMilestones.filter(m => m.status === 'Completed').length;
+      const progress = allMilestones.length > 0 ? Math.round((completedCount / allMilestones.length) * 100) : 0;
+      await Project.findByIdAndUpdate(projectId, { progress });
+    }
+
+    res.status(200).json({ success: true, msg: 'Milestone successfully deleted' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 10. DAILY LOGS BY PROJECT
+app.get('/api/projects/:projectId/progress-logs', async (req, res) => {
+  try {
+    const logs = await DailyLog.find({ projectId: req.params.projectId })
+      .populate('projectId', 'name')
+      .populate('supervisorId', 'name');
+    res.status(200).json({ success: true, count: logs.length, data: logs });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 11. BUDGET UPDATES
+app.put('/api/budgets/:id', async (req, res) => {
+  try {
+    const budget = await Budget.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    });
+    if (!budget) return res.status(404).json({ success: false, msg: 'Budget not found' });
+    res.status(200).json({ success: true, data: budget });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/budgets/:id', async (req, res) => {
+  try {
+    const budget = await Budget.findByIdAndDelete(req.params.id);
+    if (!budget) return res.status(404).json({ success: false, msg: 'Budget not found' });
+    res.status(200).json({ success: true, msg: 'Budget successfully deleted' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 12. MACHINERY / RESOURCE UPDATES
+app.post('/api/resources', async (req, res) => {
+  try {
+    const resource = await Resource.create(req.body);
+    res.status(201).json({ success: true, data: resource });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/resources/:id', async (req, res) => {
+  try {
+    const resource = await Resource.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    }).populate('currentProjectId', 'name');
+    if (!resource) return res.status(404).json({ success: false, msg: 'Resource not found' });
+    res.status(200).json({ success: true, data: resource });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/resources/:id', async (req, res) => {
+  try {
+    const resource = await Resource.findByIdAndDelete(req.params.id);
+    if (!resource) return res.status(404).json({ success: false, msg: 'Resource not found' });
+    res.status(200).json({ success: true, msg: 'Resource successfully deleted' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 13. WORKER CRUD & ALLOCATIONS
+app.put('/api/workers/:id', async (req, res) => {
+  try {
+    const worker = await Worker.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    }).populate('currentProjectId', 'name');
+    if (!worker) return res.status(404).json({ success: false, msg: 'Worker not found' });
+    res.status(200).json({ success: true, data: worker });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/workers/:id', async (req, res) => {
+  try {
+    const worker = await Worker.findByIdAndDelete(req.params.id);
+    if (!worker) return res.status(404).json({ success: false, msg: 'Worker not found' });
+    res.status(200).json({ success: true, msg: 'Worker successfully deleted' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/workers/:id/allocate', async (req, res) => {
+  try {
+    const { projectId } = req.body;
+    const worker = await Worker.findByIdAndUpdate(req.params.id, {
+      currentProjectId: projectId
+    }, { new: true }).populate('currentProjectId', 'name');
+    res.status(200).json({ success: true, data: worker });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/workers/:id/release', async (req, res) => {
+  try {
+    const worker = await Worker.findByIdAndUpdate(req.params.id, {
+      currentProjectId: null
+    }, { new: true });
+    res.status(200).json({ success: true, data: worker });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
+// Wildcard fallback route for Angular client-side routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../index.html'));
+});
 
 // Global Error handling middleware
 app.use((err, req, res, next) => {
