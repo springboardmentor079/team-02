@@ -15,8 +15,13 @@ const Budget     = require('./models/Budget');
 const DailyLog   = require('./models/DailyLog');
 
 const run = async () => {
-  await mongoose.connect(process.env.MONGODB_URI);
-  console.log('✅ Connected to Atlas:', mongoose.connection.host);
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 4000 });
+  } catch (err) {
+    console.warn(`Primary connection failed (${err.message}). Connecting to local MongoDB...`);
+    await mongoose.connect('mongodb://127.0.0.1:27017/buildtrack');
+  }
+  console.log('✅ Connected to DB:', mongoose.connection.host);
 
   // ── 1. Get project IDs from Atlas ─────────────────────────────────────
   const projects = await Project.find({});

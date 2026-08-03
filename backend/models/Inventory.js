@@ -4,31 +4,31 @@ const InventorySchema = new mongoose.Schema({
   name: {
     type: String,
     required: [true, 'Please add material name'],
-    trim: true,
-    unique: true
+    trim: true
   },
   category: {
     type: String,
-    enum: ['Cement', 'Steel', 'Bricks', 'Sand', 'Concrete', 'Electrical Materials', 'Plumbing Materials'],
-    required: true
+    required: true,
+    default: 'Cement'
   },
   quantity: {
     type: Number,
     required: [true, 'Please specify quantity'],
-    min: 0
+    min: 0,
+    default: 0
   },
   unit: {
     type: String,
-    required: [true, 'Please specify unit, e.g. Bags, Tons, Units, Coils, Cu.m']
+    default: 'Units'
   },
   threshold: {
     type: Number,
-    required: [true, 'Please specify safety threshold limit'],
+    default: 10,
     min: 0
   },
   costPerUnit: {
     type: Number,
-    required: [true, 'Please specify unit price']
+    default: 0
   },
   createdAt: {
     type: Date,

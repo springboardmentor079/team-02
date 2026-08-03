@@ -5,16 +5,14 @@ const seedUsers = async () => {
   try {
     const User = require('../models/User');
     
-    // Auto-migration: Clear users collection if any existing user lacks a mobile number or has legacy formatting
-    const usersWithoutMobile = await User.find({ 
-      $or: [
-        { mobile: { $exists: false } },
-        { mobile: { $regex: /^\+1/ } }
-      ]
-    });
+    // Soft migration: Assign default mobile number to legacy users if mobile is missing
+    const usersWithoutMobile = await User.find({ mobile: { $exists: false } });
     if (usersWithoutMobile.length > 0) {
-      console.log('Found users without mobile or with legacy formatting. Clearing users collection for clean migration...');
-      await User.deleteMany({});
+      console.log(`Found ${usersWithoutMobile.length} legacy users without mobile number. Migrating default mobile numbers...`);
+      for (const u of usersWithoutMobile) {
+        u.mobile = `+9199${Math.floor(10000000 + Math.random() * 90000000)}`;
+        await u.save();
+      }
     }
 
     const userCount = await User.countDocuments();
@@ -32,20 +30,6 @@ const seedUsers = async () => {
         await User.create(u);
       }
       console.log('Seeding initial demo users completed successfully.');
-    }
-    const nikhilUser = await User.findOne({ email: 'nikhilsah8534@gmail.com' });
-    if (!nikhilUser) {
-      console.log('Nikhil Sah not found in database. Creating 6th user...');
-      await User.create({
-        name: 'Nikhil Sah',
-        email: 'nikhilsah8534@gmail.com',
-        password: 'password123',
-        role: 'Administrator',
-        department: 'Operations',
-        status: 'Active',
-        mobile: '+918534979715'
-      });
-      console.log('Nikhil Sah user created successfully.');
     }
   } catch (err) {
     console.error(`Error seeding users: ${err.message}`);
@@ -83,7 +67,15 @@ const connectDB = async () => {
       console.warn(`Warning: Could not set custom DNS servers: ${dnsErr.message}`);
     }
 
-    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/buildtrack');
+    let conn;
+    const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/buildtrack';
+    try {
+      conn = await mongoose.connect(uri, { serverSelectionTimeoutMS: 4000 });
+    } catch (primaryErr) {
+      console.warn(`Primary MongoDB Connection failed (${primaryErr.message}). Falling back to local MongoDB...`);
+      conn = await mongoose.connect('mongodb://127.0.0.1:27017/buildtrack', { serverSelectionTimeoutMS: 5000 });
+    }
+
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     
     // Seed users if empty

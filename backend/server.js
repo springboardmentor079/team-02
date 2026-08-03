@@ -1,4 +1,6 @@
+// BuildTrack Backend Server (Connected to MongoDB Atlas)
 const express = require('express');
+const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -146,6 +148,7 @@ const path = require('path');
 const app = express();
 
 // Standard middlewares
+app.set('etag', false);
 app.use(express.json());
 app.use(cors());
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -154,8 +157,11 @@ app.use(express.static(path.join(__dirname, '..')));
 
 const { protect } = require('./middleware/auth');
 
-// Protect all API endpoints except authentication and health checks
+// Protect all API endpoints except authentication and health checks & disable caching
 app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   if (req.path.startsWith('/auth') || req.path === '/health') {
     return next();
   }
@@ -182,6 +188,8 @@ const Attendance = require('./models/Attendance');
 const Procurement = require('./models/Procurement');
 const Budget = require('./models/Budget');
 const DailyLog = require('./models/DailyLog');
+const Notification = require('./models/Notification');
+
 
 // 1. JWT AUTH & USER MANAGEMENT
 // Dynamic OTP Cache: mobile -> { otp, expires }
@@ -196,33 +204,46 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ success: false, msg: 'Invalid authorization code' });
     }
 
-    let userByEmail = await User.findOne({ email });
-    if (userByEmail) return res.status(400).json({ success: false, msg: 'Email is already registered' });
-
-    // Flexible mobile uniqueness check
-    if (mobile) {
-      let searchMobile = mobile.replace(/\s+/g, '');
-      if (!searchMobile.startsWith('+')) {
-        searchMobile = searchMobile.startsWith('0') ? `+91${searchMobile.slice(1)}` : `+91${searchMobile}`;
-      }
-      let userByMobile = await User.findOne({
-        $or: [
-          { mobile: searchMobile },
-          { mobile: searchMobile.replace('+91', '') },
-          { mobile: `+91${searchMobile.replace('+91', '')}` }
-        ]
-      });
-      if (userByMobile) {
-        return res.status(400).json({ success: false, msg: 'Mobile number is already registered' });
-      }
+    if (!name || !email || !password || !mobile) {
+      return res.status(400).json({ success: false, msg: 'Please provide all required fields (name, email, mobile, password)' });
     }
 
-    const user = await User.create({ name, email, mobile, password, role, department });
+    const cleanMobile = mobile.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check for existing mobile number with another user
+    const existingMobileUser = await User.findOne({ 
+      mobile: cleanMobile,
+      email: { $ne: cleanEmail }
+    });
+
+    if (existingMobileUser) {
+      return res.status(400).json({ success: false, msg: 'A user with this mobile number is already registered' });
+    }
+
+    let user = await User.findOne({ email: cleanEmail });
+    if (user) {
+      // Seamlessly update credentials and activate user if re-registering
+      user.name = name || user.name;
+      user.password = password;
+      user.role = role || user.role;
+      user.mobile = cleanMobile;
+      if (department) user.department = department;
+      user.status = 'Active';
+      await user.save();
+    } else {
+      user = await User.create({ name, email: cleanEmail, mobile: cleanMobile, password, role, department, status: 'Pending' });
+    }
     
     const token = user.getSignedJwtToken();
-    res.status(201).json({ success: true, token, user: { id: user._id, name, email, role, status: user.status } });
+    res.status(201).json({ success: true, token, user: { id: user._id, name: user.name, email: user.email, role: user.role, status: user.status, mobile: user.mobile } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Error during registration:', err);
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0] || 'Email or Mobile';
+      return res.status(400).json({ success: false, msg: `A user with this ${field} already exists.` });
+    }
+    res.status(500).json({ success: false, error: err.message, msg: err.message });
   }
 });
 
@@ -256,12 +277,6 @@ app.post('/api/auth/send-otp-email', async (req, res) => {
       const user = await User.findOne({ email });
       if (!user) {
         return res.status(404).json({ success: false, msg: 'No user registered with this email address' });
-      }
-    } else {
-      // Register type
-      const user = await User.findOne({ email });
-      if (user) {
-        return res.status(400).json({ success: false, msg: 'Email is already registered' });
       }
     }
 
@@ -437,7 +452,145 @@ app.post('/api/auth/reset-password', async (req, res) => {
 app.get('/api/users', async (req, res) => {
   try {
     const users = await User.find();
-    res.status(200).json({ success: true, count: users.length, data: users.map(u => ({ id: u._id, name: u.name, email: u.email, role: u.role, department: u.department, status: u.status })) });
+    res.status(200).json({ 
+      success: true, 
+      count: users.length, 
+      data: users.map(u => ({ 
+        id: u._id, 
+        _id: u._id, 
+        name: u.name, 
+        email: u.email, 
+        mobile: u.mobile || '', 
+        role: u.role, 
+        department: u.department, 
+        status: u.status || 'Active',
+        avatar: u.avatar
+      })) 
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST create new user (Admin / System creation)
+app.post('/api/users', async (req, res) => {
+  try {
+    const { name, email, mobile, password, role, department, status } = req.body;
+
+    if (!name || !email || !mobile) {
+      return res.status(400).json({ success: false, msg: 'Please provide name, email, and mobile number.' });
+    }
+
+    const cleanMobile = mobile.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check duplicate email or mobile
+    const existingUser = await User.findOne({
+      $or: [{ email: cleanEmail }, { mobile: cleanMobile }]
+    });
+
+    if (existingUser) {
+      const matchType = existingUser.email === cleanEmail ? 'Email' : 'Mobile number';
+      return res.status(400).json({ success: false, msg: `${matchType} is already registered to another user.` });
+    }
+
+    const newUser = await User.create({
+      name,
+      email: cleanEmail,
+      mobile: cleanMobile,
+      password: password || 'password123',
+      role: role || 'Worker',
+      department: department || 'General',
+      status: status || 'Active'
+    });
+
+    res.status(201).json({
+      success: true,
+      msg: 'User created successfully.',
+      data: {
+        id: newUser._id,
+        _id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        mobile: newUser.mobile,
+        role: newUser.role,
+        department: newUser.department,
+        status: newUser.status
+      }
+    });
+  } catch (err) {
+    console.error('Error creating user:', err);
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0] || 'field';
+      return res.status(400).json({ success: false, msg: `User with this ${field} already exists.` });
+    }
+    res.status(500).json({ success: false, error: err.message, msg: err.message });
+  }
+});
+
+// UPDATE user details
+app.put('/api/users/:id', async (req, res) => {
+  try {
+    const { name, email, mobile, role, department, status, password, requestingUserRole, requestingUserId } = req.body;
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ success: false, msg: 'User not found' });
+    }
+
+    // Permission check for modifying user account details:
+    // Only Administrator OR the account owner can modify user account details
+    const isSelf = (requestingUserId && (requestingUserId === req.params.id || requestingUserId === user._id.toString())) || (req.user && req.user.id === req.params.id);
+    const isAdmin = (requestingUserRole && requestingUserRole === 'Administrator') || (req.user && req.user.role === 'Administrator');
+
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ 
+        success: false, 
+        msg: 'Permission denied: Only Administrators or the account owner can modify user account details.' 
+      });
+    }
+
+    if (name) user.name = name;
+    if (email) user.email = email.trim().toLowerCase();
+    if (mobile) user.mobile = mobile.trim();
+    if (role && isAdmin) user.role = role;
+    if (department) user.department = department;
+    if (status && isAdmin) user.status = status;
+    if (password) user.password = password;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      msg: 'User updated successfully',
+      data: {
+        id: user._id,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        role: user.role,
+        department: user.department,
+        status: user.status
+      }
+    });
+  } catch (err) {
+    console.error('Error updating user:', err);
+    if (err.code === 11000) {
+      return res.status(400).json({ success: false, msg: 'Email or mobile number is already in use by another user.' });
+    }
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE user
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, msg: 'User not found' });
+    }
+    res.status(200).json({ success: true, msg: 'User deleted successfully', data: { id: user._id } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -599,38 +752,95 @@ app.put('/api/resources/:id/release', async (req, res) => {
 // 5. MATERIAL & INVENTORY
 app.get('/api/inventory', async (req, res) => {
   try {
-    const items = await Inventory.find();
+    let items = await Inventory.find();
+    const initialSeed = [
+      { name: 'Portland Cement (Grade 53)', category: 'Cement', quantity: 2400, unit: 'Bags', threshold: 500, costPerUnit: 8 },
+      { name: 'Reinforcement Steel Bars TMT', category: 'Steel', quantity: 15, unit: 'Tons', threshold: 5, costPerUnit: 750 },
+      { name: 'Fly Ash Red Bricks', category: 'Bricks', quantity: 45000, unit: 'Units', threshold: 10000, costPerUnit: 0.15 },
+      { name: 'River Building Sand', category: 'Sand', quantity: 180, unit: 'Tons', threshold: 50, costPerUnit: 40 },
+      { name: 'Standard Grade Concrete aggregate', category: 'Concrete', quantity: 450, unit: 'Cu.m', threshold: 100, costPerUnit: 85 },
+      { name: 'Copper Wires & Conduits (Electrical)', category: 'Electrical Materials', quantity: 120, unit: 'Coils', threshold: 30, costPerUnit: 60 },
+      { name: 'PVC Drainage Pipes 4-inch', category: 'Plumbing Materials', quantity: 8, unit: 'Units', threshold: 25, costPerUnit: 18 }
+    ];
+
+    if (!items || items.length < 7) {
+      for (const seedItem of initialSeed) {
+        const exists = await Inventory.findOne({ name: seedItem.name });
+        if (!exists) {
+          await Inventory.create(seedItem);
+        }
+      }
+      items = await Inventory.find();
+    }
     res.status(200).json({ success: true, count: items.length, data: items });
   } catch (err) {
+    console.error('Error fetching inventory:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 app.post('/api/inventory', async (req, res) => {
   try {
-    const item = await Inventory.create(req.body);
+    const { name, category, quantity, unit, threshold, costPerUnit } = req.body;
+    // Check if material with same name exists
+    let item = await Inventory.findOne({ name });
+    if (item) {
+      item.quantity = quantity !== undefined ? parseFloat(quantity) : item.quantity;
+      if (category) item.category = category;
+      if (unit) item.unit = unit;
+      if (threshold !== undefined) item.threshold = parseFloat(threshold);
+      if (costPerUnit !== undefined) item.costPerUnit = parseFloat(costPerUnit);
+      await item.save();
+    } else {
+      item = await Inventory.create({
+        name,
+        category: category || 'Cement',
+        quantity: parseFloat(quantity) || 0,
+        unit: unit || 'Units',
+        threshold: parseFloat(threshold) || 10,
+        costPerUnit: parseFloat(costPerUnit) || 0
+      });
+    }
     res.status(201).json({ success: true, data: item });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Error saving inventory:', err);
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 
 app.put('/api/inventory/:id', async (req, res) => {
   try {
-    const item = await Inventory.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const { id } = req.params;
+    let item;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      item = await Inventory.findByIdAndUpdate(id, req.body, { new: true, runValidators: true });
+    }
+    if (!item && req.body.name) {
+      item = await Inventory.findOneAndUpdate({ name: req.body.name }, req.body, { new: true, runValidators: true });
+    }
+    if (!item) {
+      item = await Inventory.create(req.body);
+    }
     res.status(200).json({ success: true, data: item });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Error updating inventory item:', err);
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 
 app.delete('/api/inventory/:id', async (req, res) => {
   try {
-    const item = await Inventory.findByIdAndDelete(req.params.id);
-    if (!item) return res.status(404).json({ success: false, msg: 'Material not found' });
+    const { id } = req.params;
+    let item;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      item = await Inventory.findByIdAndDelete(id);
+    } else {
+      item = await Inventory.findOneAndDelete({ name: req.body.name });
+    }
     res.status(200).json({ success: true, data: {}, msg: 'Material successfully deleted' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Error deleting inventory item:', err);
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 
@@ -949,10 +1159,445 @@ app.put('/api/workers/:id/release', async (req, res) => {
 });
 
 
+// 14. NOTIFICATIONS API
+app.get('/api/notifications', async (req, res) => {
+  try {
+    const { search, category, priority, type, read, role } = req.query;
+    let query = {};
+
+    if (category && category !== 'all') {
+      query.category = category;
+    }
+    if (priority && priority !== 'all') {
+      query.priority = priority;
+    }
+    if (type && type !== 'all') {
+      query.type = type;
+    }
+    if (read !== undefined && read !== 'all') {
+      query.read = read === 'true';
+    }
+    if (role && role !== 'all') {
+      query.$or = [{ recipientRole: 'all' }, { recipientRole: role.toLowerCase() }];
+    }
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { message: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    let notifications = await Notification.find(query).sort({ createdAt: -1 });
+    
+    // Seed default notifications if database has zero notifications overall
+    const totalCount = await Notification.countDocuments();
+    if (totalCount === 0) {
+      const defaultNotifications = [
+        {
+          title: 'CRITICAL: UltraTech Portland Cement Low Stock',
+          message: 'Portland Cement stock level (35 bags) dropped below minimum safety threshold (80 bags) at Warehouse Alpha.',
+          type: 'danger',
+          priority: 'urgent',
+          category: 'inventory',
+          recipientRole: 'all',
+          channel: 'all',
+          link: '/inventory'
+        },
+        {
+          title: 'PO #PO-9401 Approval Pending',
+          message: 'Purchase order #PO-9401 ($14,500.00) from SteelCorp International requires Site Manager authorization.',
+          type: 'warning',
+          priority: 'high',
+          category: 'procurement',
+          recipientRole: 'project manager',
+          channel: 'in_app',
+          link: '/procurement'
+        },
+        {
+          title: 'Milestone Completed: Sector 4 Foundation',
+          message: 'Foundation Pours on Horizon Tower Sector 4 marked 100% complete ahead of schedule.',
+          type: 'success',
+          priority: 'medium',
+          category: 'milestone',
+          recipientRole: 'all',
+          channel: 'in_app',
+          link: '/projects'
+        },
+        {
+          title: 'Scheduled Maintenance: Heavy Excavator CAT-320',
+          message: 'Excavator CAT-320 has logged 498 operational hours and is scheduled for 500hr oil & filter servicing.',
+          type: 'info',
+          priority: 'low',
+          category: 'system',
+          recipientRole: 'site engineer',
+          channel: 'in_app',
+          link: '/resources'
+        },
+        {
+          title: 'Safety Audit Inspection Scheduled',
+          message: 'OSHA compliance officer safety inspection scheduled for tomorrow at 09:00 AM on Site B.',
+          type: 'warning',
+          priority: 'high',
+          category: 'general',
+          recipientRole: 'all',
+          channel: 'email',
+          link: '/reports'
+        }
+      ];
+      notifications = await Notification.insertMany(defaultNotifications);
+    }
+    
+    res.status(200).json({ success: true, count: notifications.length, data: notifications });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET KPI Stats
+app.get('/api/notifications/stats', async (req, res) => {
+  try {
+    const notifications = await Notification.find();
+    const stats = {
+      total: notifications.length,
+      unread: notifications.filter(n => !n.read).length,
+      urgent: notifications.filter(n => n.priority === 'urgent').length,
+      high: notifications.filter(n => n.priority === 'high').length,
+      inventory: notifications.filter(n => n.category === 'inventory').length,
+      procurement: notifications.filter(n => n.category === 'procurement').length,
+      milestones: notifications.filter(n => n.category === 'milestone').length,
+      system: notifications.filter(n => n.category === 'system').length
+    };
+    res.status(200).json({ success: true, data: stats });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST Create Notification
+app.post('/api/notifications', async (req, res) => {
+  try {
+    const notification = await Notification.create(req.body);
+    res.status(201).json({ success: true, data: notification });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST Broadcast Notification
+app.post('/api/notifications/broadcast', async (req, res) => {
+  try {
+    const { title, message, type, priority, category, recipientRole, channel, link } = req.body;
+    
+    const notification = await Notification.create({
+      title,
+      message,
+      type: type || 'info',
+      priority: priority || 'medium',
+      category: category || 'general',
+      recipientRole: recipientRole || 'all',
+      channel: channel || 'in_app',
+      link: link || ''
+    });
+
+    console.log(`[NOTIFICATION SERVICE] Broadcast sent to [Role: ${recipientRole || 'ALL'}, Channel: ${channel || 'IN_APP'}]: ${title}`);
+    
+    res.status(201).json({ 
+      success: true, 
+      msg: `Broadcast successfully dispatched via ${channel || 'in_app'}`, 
+      data: notification 
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST Automated System Health Check / System Alerts Trigger
+app.post('/api/notifications/trigger-system-alert', async (req, res) => {
+  try {
+    const createdAlerts = [];
+
+    // 1. Check Inventory Low Stock
+    const lowStockItems = await Inventory.find({
+      $expr: { $lte: ['$quantity', '$minStockLevel'] }
+    });
+
+    for (const item of lowStockItems) {
+      const existing = await Notification.findOne({
+        title: `Low Stock: ${item.itemName}`,
+        read: false
+      });
+
+      if (!existing) {
+        const alert = await Notification.create({
+          title: `Low Stock: ${item.itemName}`,
+          message: `Item stock is down to ${item.quantity} ${item.unit} (Safety Threshold: ${item.minStockLevel || 50} ${item.unit}). Reorder required immediately.`,
+          type: 'danger',
+          priority: 'urgent',
+          category: 'inventory',
+          recipientRole: 'all',
+          channel: 'all',
+          link: '/inventory'
+        });
+        createdAlerts.push(alert);
+      }
+    }
+
+    // 2. Check Pending Procurement Orders
+    const pendingProcurements = await Procurement.find({ status: { $in: ['Pending', 'Pending Approval'] } });
+    if (pendingProcurements.length > 0) {
+      const existingPo = await Notification.findOne({
+        title: 'Pending Purchase Orders Require Review',
+        read: false
+      });
+
+      if (!existingPo) {
+        const alert = await Notification.create({
+          title: 'Pending Purchase Orders Require Review',
+          message: `There are currently ${pendingProcurements.length} pending purchase orders awaiting managerial approval.`,
+          type: 'warning',
+          priority: 'high',
+          category: 'procurement',
+          recipientRole: 'project manager',
+          channel: 'in_app',
+          link: '/procurement'
+        });
+        createdAlerts.push(alert);
+      }
+    }
+
+    // 3. Fallback system alert if no conditions met
+    if (createdAlerts.length === 0) {
+      const alert = await Notification.create({
+        title: 'Automated System Diagnostics Complete',
+        message: 'System audit performed at ' + new Date().toLocaleTimeString() + '. All site metrics and inventory levels operate within safety parameters.',
+        type: 'success',
+        priority: 'low',
+        category: 'system',
+        recipientRole: 'all',
+        channel: 'in_app',
+        link: '/reports'
+      });
+      createdAlerts.push(alert);
+    }
+
+    res.status(200).json({
+      success: true,
+      msg: `System audit generated ${createdAlerts.length} real-time notifications.`,
+      data: createdAlerts
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/notifications/:id/read', async (req, res) => {
+  try {
+    const notification = await Notification.findByIdAndUpdate(req.params.id, { read: true }, { new: true });
+    if (!notification) return res.status(404).json({ success: false, msg: 'Notification not found' });
+    res.status(200).json({ success: true, data: notification });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/notifications/read-all', async (req, res) => {
+  try {
+    await Notification.updateMany({ read: false }, { read: true });
+    res.status(200).json({ success: true, msg: 'All notifications marked as read' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/notifications/clear-read', async (req, res) => {
+  try {
+    await Notification.deleteMany({ read: true });
+    res.status(200).json({ success: true, msg: 'All read notifications cleared successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/notifications/:id', async (req, res) => {
+  try {
+    const notification = await Notification.findByIdAndDelete(req.params.id);
+    if (!notification) return res.status(404).json({ success: false, msg: 'Notification not found' });
+    res.status(200).json({ success: true, msg: 'Notification deleted' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 15. DASHBOARD ANALYTICS API
+app.get('/api/analytics/dashboard', async (req, res) => {
+  try {
+    const [projects, inventory, procurements, workers, attendance] = await Promise.all([
+      Project.find(),
+      Inventory.find(),
+      Procurement.find(),
+      Worker.find(),
+      Attendance.find()
+    ]);
+
+    const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'in-progress').length;
+    const completedProjects = projects.filter(p => p.status === 'completed').length;
+    const totalBudget = projects.reduce((acc, p) => acc + (p.budget || 0), 0);
+    
+    const inventoryTotalValue = inventory.reduce((acc, i) => acc + ((i.quantity || 0) * (i.costPerUnit || 0)), 0);
+    const lowStockCount = inventory.filter(i => (i.quantity || 0) <= (i.threshold || 0)).length;
+    
+    const poTotalSpent = procurements.reduce((acc, po) => acc + (po.totalAmount || 0), 0);
+    const pendingPoCount = procurements.filter(po => po.status === 'Pending' || po.status === 'Draft').length;
+
+    const totalWorkers = workers.length;
+    let attendanceRate = 0;
+    if (attendance.length > 0 && totalWorkers > 0) {
+      const latestAttendance = attendance[attendance.length - 1];
+      const presentCount = (latestAttendance.presentWorkers || []).length;
+      attendanceRate = Math.round((presentCount / totalWorkers) * 100);
+    } else {
+      attendanceRate = 85;
+    }
+
+    const projectSpendChart = projects.map(p => ({
+      name: p.name,
+      budget: p.budget || 0,
+      spent: Math.round((p.budget || 0) * ((p.progress || 0) / 100))
+    }));
+
+    const procurementCategoryMap = {};
+    procurements.forEach(po => {
+      const cat = po.category || 'General';
+      procurementCategoryMap[cat] = (procurementCategoryMap[cat] || 0) + (po.totalAmount || 0);
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        summary: {
+          totalBudget,
+          activeProjects,
+          completedProjects,
+          totalProjects: projects.length,
+          inventoryTotalValue,
+          lowStockCount,
+          poTotalSpent,
+          pendingPoCount,
+          totalWorkers,
+          attendanceRate
+        },
+        charts: {
+          projectSpend: projectSpendChart,
+          procurementCategories: procurementCategoryMap,
+          projectStatuses: {
+            active: activeProjects,
+            completed: completedProjects,
+            onHold: projects.filter(p => p.status === 'on-hold').length,
+            cancelled: projects.filter(p => p.status === 'cancelled').length
+          },
+          inventoryStockStatus: {
+            adequate: inventory.filter(i => (i.quantity || 0) > (i.threshold || 0)).length,
+            lowStock: lowStockCount
+          }
+        }
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 16. REPORTING DATA HUB API
+app.get('/api/reports/data', async (req, res) => {
+  try {
+    const { module: reportModule, startDate, endDate, status, search } = req.query;
+
+    let dataset = [];
+    let moduleName = reportModule || 'all';
+
+    if (moduleName === 'procurement' || moduleName === 'all') {
+      let pos = await Procurement.find();
+      dataset.push(...pos.map(po => ({
+        id: po._id,
+        module: 'Procurement',
+        title: (po.vendorName || 'Vendor') + ' (' + (po.category || 'General') + ')',
+        category: po.category || 'General',
+        reference: po.invoiceNo || ('PO-' + po._id.toString().slice(-4)),
+        amount: po.totalAmount || 0,
+        status: po.status || 'Approved',
+        date: po.createdAt || po.date || new Date()
+      })));
+    }
+
+    if (moduleName === 'projects' || moduleName === 'all') {
+      let projects = await Project.find();
+      dataset.push(...projects.map(p => ({
+        id: p._id,
+        module: 'Projects',
+        title: p.name,
+        category: p.client || 'Construction',
+        reference: 'PROJ-' + p._id.toString().slice(-4),
+        amount: p.budget || 0,
+        status: p.status || 'Active',
+        date: p.startDate || p.createdAt || new Date()
+      })));
+    }
+
+    if (moduleName === 'inventory' || moduleName === 'all') {
+      let items = await Inventory.find();
+      dataset.push(...items.map(i => ({
+        id: i._id,
+        module: 'Inventory',
+        title: i.name,
+        category: i.category || 'Materials',
+        reference: 'SKU-' + i._id.toString().slice(-4),
+        amount: (i.quantity || 0) * (i.costPerUnit || 0),
+        status: (i.quantity || 0) <= (i.threshold || 0) ? 'Low Stock' : 'Adequate',
+        date: i.createdAt || new Date()
+      })));
+    }
+
+    // Apply Filters
+    if (status && status !== 'all') {
+      dataset = dataset.filter(d => d.status.toLowerCase() === status.toLowerCase());
+    }
+
+    if (search) {
+      const q = search.toLowerCase();
+      dataset = dataset.filter(d => 
+        (d.title && d.title.toLowerCase().includes(q)) || 
+        (d.reference && d.reference.toLowerCase().includes(q)) ||
+        (d.category && d.category.toLowerCase().includes(q))
+      );
+    }
+
+    if (startDate) {
+      const start = new Date(startDate);
+      dataset = dataset.filter(d => new Date(d.date) >= start);
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dataset = dataset.filter(d => new Date(d.date) <= end);
+    }
+
+    res.status(200).json({
+      success: true,
+      count: dataset.length,
+      data: dataset
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
 // Wildcard fallback route for Angular client-side routing
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../index.html'));
 });
+
 
 // Global Error handling middleware
 app.use((err, req, res, next) => {

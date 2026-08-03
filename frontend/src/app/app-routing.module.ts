@@ -10,6 +10,8 @@ import { ResourcesComponent } from './components/resources/resources.component';
 import { InventoryComponent } from './components/inventory/inventory.component';
 import { AttendanceComponent } from './components/attendance/attendance.component';
 import { ProcurementComponent } from './components/procurement/procurement.component';
+import { ReportsComponent } from './components/reports/reports.component';
+import { NotificationsComponent } from './components/notifications/notifications.component';
 import { AuthGuard } from './guards/auth.guard';
 
 const routes: Routes = [
@@ -18,6 +20,11 @@ const routes: Routes = [
   { 
     path: 'dashboard', 
     component: DashboardComponent, 
+    canActivate: [AuthGuard] 
+  },
+  { 
+    path: 'notifications', 
+    component: NotificationsComponent, 
     canActivate: [AuthGuard] 
   },
   { 
@@ -43,6 +50,11 @@ const routes: Routes = [
   { 
     path: 'procurement', 
     component: ProcurementComponent, 
+    canActivate: [AuthGuard] 
+  },
+  { 
+    path: 'reports', 
+    component: ReportsComponent, 
     canActivate: [AuthGuard] 
   },
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
