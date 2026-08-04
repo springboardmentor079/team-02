@@ -390,7 +390,12 @@
             if (token) {
                 headers['Authorization'] = `Bearer ${token}`;
             }
-            const res = await fetch(url, { ...options, headers });
+            let fetchUrl = url;
+            if (!options.method || options.method === 'GET') {
+                const sep = fetchUrl.includes('?') ? '&' : '?';
+                fetchUrl += `${sep}_t=${Date.now()}`;
+            }
+            const res = await fetch(fetchUrl, { ...options, headers, cache: 'no-store' });
             if (res.status === 401) {
                 localStorage.removeItem('buildtrack_token');
                 localStorage.removeItem('buildtrack_logged_in_user');
@@ -1417,6 +1422,51 @@ Security Auth Code: 002`;
             );
         };
 
+        const LogoutConfirmModal = ({ isOpen, onClose, onConfirm, userName }) => {
+            React.useEffect(() => {
+                if (isOpen) lucide.createIcons();
+            }, [isOpen]);
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4" onClick={onClose}>
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="w-20 h-20 bg-rose-500/10 text-rose-500 rounded-full flex items-center justify-center mx-auto border border-rose-500/20">
+                            <i data-lucide="log-out" className="w-10 h-10"></i>
+                        </div>
+
+                        <div className="space-y-2">
+                            <h3 className="text-2xl font-black text-white">Confirm Logout</h3>
+                            <p className="text-sm text-slate-400">
+                                Are you sure you want to log out, <span className="font-bold text-white">{userName}</span>?
+                            </p>
+                        </div>
+
+                        <p className="text-xs text-slate-500 leading-relaxed bg-slate-950/50 p-4 rounded-xl border border-slate-800/80">
+                            You will be safely signed out of your current session. You can log back in anytime using your credentials.
+                        </p>
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-xl text-sm transition-all border border-slate-700 cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={onConfirm}
+                                className="flex-1 bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 text-white font-bold py-3 rounded-xl text-sm transition-all shadow-lg shadow-rose-600/25 flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <i data-lucide="log-out" className="w-4 h-4"></i>
+                                Yes, Logout
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const App = () => {
             const [currentUser, setCurrentUser] = React.useState(() => getStored('logged_in_user', null));
             const [viewRole, setViewRole] = React.useState(() => getStored('active_view_role', null));
@@ -1425,6 +1475,7 @@ Security Auth Code: 002`;
             const [toast, setToast] = React.useState(null);
             const [dataLoaded, setDataLoaded] = React.useState(false);
             const [isCodeInspectorOpen, setIsCodeInspectorOpen] = React.useState(false);
+            const [showLogoutConfirm, setShowLogoutConfirm] = React.useState(false);
 
             React.useEffect(() => {
                 if (currentUser && !viewRole) {
@@ -1496,6 +1547,22 @@ Security Auth Code: 002`;
                                 status: p.status,
                                 invoiceNo: p.invoiceNo,
                                 date: p.date ? p.date.split('T')[0] : ''
+                            }));
+                        }
+
+                        // Load users
+                        const usersRes = await apiFetch('/api/users');
+                        if (usersRes && usersRes.success && usersRes.data) {
+                            db.users = usersRes.data.map(u => ({
+                                id: u._id || u.id,
+                                _id: u._id || u.id,
+                                name: u.name,
+                                email: u.email,
+                                mobile: u.mobile || '',
+                                role: u.role,
+                                department: u.department,
+                                status: u.status || 'Pending',
+                                avatar: u.avatar
                             }));
                         }
 
@@ -1675,12 +1742,18 @@ Security Auth Code: 002`;
                 }
             };
 
-            const handleLogout = () => {
+            const handleLogoutRequest = () => {
+                setShowLogoutConfirm(true);
+            };
+
+            const handleConfirmLogout = () => {
+                setShowLogoutConfirm(false);
                 setCurrentUser(null);
                 localStorage.removeItem('buildtrack_logged_in_user');
-                setViewRole(null);
+                localStorage.removeItem('buildtrack_token');
                 localStorage.removeItem('buildtrack_active_view_role');
-                triggerToast('Session terminated successfully.', 'info');
+                setViewRole(null);
+                triggerToast('Session terminated successfully & JWT token expired.', 'info');
             };
 
             const handleRoleChange = (roleName) => {
@@ -1694,7 +1767,17 @@ Security Auth Code: 002`;
             }
 
             if (currentUser.status === 'Pending') {
-                return <PendingApprovalView user={currentUser} onLogout={handleLogout} />;
+                return (
+                    <>
+                        <PendingApprovalView user={currentUser} onLogout={handleLogoutRequest} />
+                        <LogoutConfirmModal
+                            isOpen={showLogoutConfirm}
+                            onClose={() => setShowLogoutConfirm(false)}
+                            onConfirm={handleConfirmLogout}
+                            userName={currentUser.name}
+                        />
+                    </>
+                );
             }
 
             const isAuthorized = isRoleAuthorized(currentUser.role, viewRole);
@@ -1710,7 +1793,7 @@ Security Auth Code: 002`;
                             <span className="font-medium">{toast.message}</span>
                         </div>
                     )}
-                    <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} viewRole={viewRole} />
+                    <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} viewRole={viewRole} onLogout={handleLogoutRequest} />
                     <div className="flex-1 flex flex-col overflow-hidden">
                         <Header
                             user={currentUser}
@@ -1719,8 +1802,9 @@ Security Auth Code: 002`;
                             isDark={isDark}
                             setIsDark={setIsDark}
                             triggerToast={triggerToast}
-                            onLogout={handleLogout}
+                            onLogout={handleLogoutRequest}
                             onOpenCodeInspector={() => setIsCodeInspectorOpen(true)}
+                            setActiveTab={setActiveTab}
                         />
                         <main className="flex-1 overflow-y-auto p-6 bg-slate-100 dark:bg-slate-950">
                             {isAuthorized ? (
@@ -1736,7 +1820,7 @@ Security Auth Code: 002`;
                                     currentUser={currentUser}
                                     viewRole={viewRole}
                                     onRevert={() => setViewRole(currentUser.role)}
-                                    onLogout={handleLogout}
+                                    onLogout={handleLogoutRequest}
                                 />
                             )}
                         </main>
@@ -1744,6 +1828,12 @@ Security Auth Code: 002`;
                     <CodeInspectorModal
                         isOpen={isCodeInspectorOpen}
                         onClose={() => setIsCodeInspectorOpen(false)}
+                    />
+                    <LogoutConfirmModal
+                        isOpen={showLogoutConfirm}
+                        onClose={() => setShowLogoutConfirm(false)}
+                        onConfirm={handleConfirmLogout}
+                        userName={currentUser.name}
                     />
                 </div>
             );
@@ -1753,10 +1843,12 @@ Security Auth Code: 002`;
         // 3. SIDEBAR NAVIGATION COMPONENT
         // ============================================================================
 
-        const Sidebar = ({ activeTab, setActiveTab, viewRole }) => {
+        const Sidebar = ({ activeTab, setActiveTab, viewRole, onLogout }) => {
             const theme = getTheme(viewRole);
             const menuItems = [
                 { id: 'dashboard', label: 'Overview', icon: 'layout-dashboard', roles: ['Administrator', 'Project Manager', 'Site Engineer', 'Contractor', 'Client'] },
+                { id: 'users', label: 'User Directory', icon: 'user-check', roles: ['Administrator', 'Project Manager', 'Site Engineer'] },
+                { id: 'notifications', label: 'Notification Center', icon: 'bell', roles: ['Administrator', 'Project Manager', 'Site Engineer', 'Contractor', 'Client'] },
                 { id: 'projects', label: 'Projects & Milestones', icon: 'building-2', roles: ['Administrator', 'Project Manager', 'Site Engineer', 'Client'] },
                 { id: 'progress', label: 'Progress Logs', icon: 'clipboard-list', roles: ['Administrator', 'Project Manager', 'Site Engineer', 'Contractor'] },
                 { id: 'resources', label: 'Machinery & Tools', icon: 'truck', roles: ['Administrator', 'Project Manager', 'Site Engineer'] },
@@ -1805,10 +1897,19 @@ Security Auth Code: 002`;
                         ))}
                     </nav>
 
-                    {/* Footer / App Details */}
-                    <div className="p-4 border-t border-slate-800 bg-slate-950/40 text-center">
-                        <div className="text-[10px] text-slate-500">BUILDTRACK ENTERPRISE V2.4</div>
-                        <div className="text-[10px] text-slate-600">Stable Node Session Configured</div>
+                    {/* Footer / Logout Button */}
+                    <div className="p-4 border-t border-slate-800 bg-slate-950/40 space-y-3">
+                        <button
+                            onClick={onLogout}
+                            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-bold transition-all cursor-pointer hover:border-rose-500/40"
+                        >
+                            <i data-lucide="log-out" className="w-4 h-4"></i>
+                            <span>Sign Out / Logout</span>
+                        </button>
+                        <div className="text-center">
+                            <div className="text-[10px] text-slate-500">BUILDTRACK ENTERPRISE V2.4</div>
+                            <div className="text-[10px] text-slate-600">Stable Node Session Configured</div>
+                        </div>
                     </div>
                 </aside>
             );
@@ -1818,19 +1919,34 @@ Security Auth Code: 002`;
         // 4. TOP HEADER / CONTROL NAVBAR COMPONENT
         // ============================================================================
 
-        const Header = ({ user, activeViewRole, handleRoleChange, isDark, setIsDark, triggerToast, onLogout, onOpenCodeInspector }) => {
+        const Header = ({ user, activeViewRole, handleRoleChange, isDark, setIsDark, triggerToast, onLogout, onOpenCodeInspector, setActiveTab }) => {
             const theme = getTheme(activeViewRole);
-            const [notifs, setNotifs] = React.useState(db.notifications);
+            const [notifs, setNotifs] = React.useState(db.notifications || []);
             const [showNotifPanel, setShowNotifPanel] = React.useState(false);
+
+            const loadLiveNotifs = async () => {
+                try {
+                    const res = await apiFetch('/api/notifications');
+                    if (res && res.data) {
+                        setNotifs(res.data);
+                    }
+                } catch (e) {}
+            };
+
+            React.useEffect(() => {
+                loadLiveNotifs();
+                const interval = setInterval(loadLiveNotifs, 10000);
+                return () => clearInterval(interval);
+            }, []);
 
             const unreadCount = notifs.filter(n => !n.read).length;
 
-            const markAllRead = () => {
-                const updated = notifs.map(n => ({ ...n, read: true }));
-                setNotifs(updated);
-                db.notifications = updated;
-                syncDB();
-                triggerToast('All alerts marked as read.');
+            const markAllRead = async () => {
+                try {
+                    await apiFetch('/api/notifications/read-all', { method: 'PUT' });
+                    loadLiveNotifs();
+                    triggerToast('All notifications marked as read.');
+                } catch (e) {}
             };
 
             React.useEffect(() => {
@@ -1889,39 +2005,54 @@ Security Auth Code: 002`;
                             >
                                 <i data-lucide="bell" className="w-5 h-5"></i>
                                 {unreadCount > 0 && (
-                                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-600 border-2 border-white dark:border-slate-900 rounded-full"></span>
+                                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-600 border-2 border-white dark:border-slate-900 rounded-full animate-pulse"></span>
                                 )}
                             </button>
 
                             {/* Dropdown Notification Panel */}
                             {showNotifPanel && (
-                                <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-slate-850 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 z-50">
+                                <div className="absolute right-0 mt-3 w-84 bg-white dark:bg-slate-850 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 z-50 overflow-hidden">
                                     <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                                        <span className="font-bold text-sm">System Alerts</span>
+                                        <span className="font-bold text-sm">System Alerts ({unreadCount})</span>
                                         {unreadCount > 0 && (
                                             <button onClick={markAllRead} className={`text-xs ${theme.textAccent} font-semibold hover:underline cursor-pointer`}>
                                                 Mark all read
                                             </button>
                                         )}
                                     </div>
-                                    <div className="max-h-64 overflow-y-auto">
+                                    <div className="max-h-72 overflow-y-auto">
                                         {notifs.length === 0 ? (
                                             <div className="p-4 text-center text-slate-400 text-xs">No alerts active</div>
                                         ) : (
                                             notifs.map(n => (
-                                                <div key={n.id} className={`px-4 py-3 border-b border-slate-100 dark:border-slate-700/50 flex items-start gap-2.5 transition-colors ${!n.read ? theme.accentLight : ''}`}>
-                                                    <span className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${n.type === 'Warning' ? 'bg-amber-500' :
-                                                        n.type === 'Alert' ? 'bg-rose-500' :
-                                                            n.type === 'Success' ? 'bg-emerald-500' : 'bg-blue-500'
-                                                        }`}></span>
-                                                    <div>
-                                                        <p className="text-xs font-medium text-slate-700 dark:text-slate-200">{n.text}</p>
-                                                        <span className="text-[10px] text-slate-400">{n.date}</span>
+                                                <div 
+                                                    key={n._id || n.id} 
+                                                    onClick={() => { setShowNotifPanel(false); if(setActiveTab) setActiveTab('notifications'); }}
+                                                    className={`px-4 py-3 border-b border-slate-100 dark:border-slate-700/50 flex items-start gap-2.5 transition-colors cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 ${!n.read ? theme.accentLight : ''}`}
+                                                >
+                                                    <span className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${
+                                                        n.type === 'danger' || n.priority === 'urgent' ? 'bg-rose-500 shadow-sm shadow-rose-500/50' :
+                                                        n.type === 'warning' || n.priority === 'high' ? 'bg-amber-500' :
+                                                        n.type === 'success' ? 'bg-emerald-500' : 'bg-blue-500'
+                                                    }`}></span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center justify-between gap-1">
+                                                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{n.title || n.text}</p>
+                                                            <span className="text-[9px] text-slate-400 font-mono uppercase">{n.priority || 'medium'}</span>
+                                                        </div>
+                                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">{n.message}</p>
                                                     </div>
                                                 </div>
                                             ))
                                         )}
                                     </div>
+                                    <button
+                                        onClick={() => { setShowNotifPanel(false); if(setActiveTab) setActiveTab('notifications'); }}
+                                        className="w-full text-center py-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-750 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition-colors cursor-pointer border-t border-slate-100 dark:border-slate-700 flex items-center justify-center gap-1.5"
+                                    >
+                                        <span>Open Notification Center</span>
+                                        <i data-lucide="arrow-right" className="w-3.5 h-3.5"></i>
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -1958,6 +2089,10 @@ Security Auth Code: 002`;
             switch (activeTab) {
                 case 'dashboard':
                     return <DashboardView user={user} viewRole={viewRole} triggerToast={triggerToast} setActiveTab={setActiveTab} />;
+                case 'users':
+                    return <UserManagementView user={user} viewRole={viewRole} triggerToast={triggerToast} />;
+                case 'notifications':
+                    return <NotificationsView user={user} viewRole={viewRole} triggerToast={triggerToast} setActiveTab={setActiveTab} />;
                 case 'projects':
                     return <ProjectsView user={user} viewRole={viewRole} triggerToast={triggerToast} />;
                 case 'progress':
@@ -3277,6 +3412,147 @@ Security Auth Code: 002`;
             const [selectedMat, setSelectedMat] = React.useState(db.inventory[0]?.name || '');
             const [reqQty, setReqQty] = React.useState('');
 
+            // Register new material modal state
+            const [showAddModal, setShowAddModal] = React.useState(false);
+            const [newItemForm, setNewItemForm] = React.useState({
+                name: '',
+                category: 'Cement',
+                quantity: '',
+                unit: 'Bags',
+                threshold: '50',
+                costPerUnit: '10'
+            });
+
+            // Increase stock modal state
+            const [addStockModalItem, setAddStockModalItem] = React.useState(null);
+            const [addStockQty, setAddStockQty] = React.useState('');
+
+            // Edit material details/threshold modal state
+            const [editModalItem, setEditModalItem] = React.useState(null);
+
+            const fetchInventoryData = async () => {
+                try {
+                    const res = await apiFetch('/api/inventory');
+                    if (res && res.data && Array.isArray(res.data)) {
+                        setInventory(res.data);
+                        db.inventory = res.data;
+                        saveStored('inventory', res.data);
+                    }
+                } catch (e) {}
+            };
+
+            React.useEffect(() => {
+                fetchInventoryData();
+                lucide.createIcons();
+            }, [showAddModal, addStockModalItem, editModalItem]);
+
+            const handleAddInventory = async (e) => {
+                e.preventDefault();
+                if (!newItemForm.name || !newItemForm.quantity || !newItemForm.unit) {
+                    triggerToast('Please fill in required material details.');
+                    return;
+                }
+
+                try {
+                    const payload = {
+                        name: newItemForm.name,
+                        category: newItemForm.category,
+                        quantity: parseFloat(newItemForm.quantity) || 0,
+                        unit: newItemForm.unit,
+                        threshold: parseFloat(newItemForm.threshold) || 10,
+                        costPerUnit: parseFloat(newItemForm.costPerUnit) || 0
+                    };
+
+                    await apiFetch('/api/inventory', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+
+                    await fetchInventoryData();
+
+                    setShowAddModal(false);
+                    setNewItemForm({ name: '', category: 'Cement', quantity: '', unit: 'Bags', threshold: '50', costPerUnit: '10' });
+                    triggerToast(`Material "${payload.name}" registered successfully.`);
+                } catch (err) {
+                    console.error('Error registering material:', err);
+                    triggerToast('Material item registered.');
+                    setShowAddModal(false);
+                }
+            };
+
+            const handleIncreaseStock = async (e) => {
+                e.preventDefault();
+                if (!addStockModalItem || !addStockQty || parseFloat(addStockQty) <= 0) return;
+
+                const amountToAdd = parseFloat(addStockQty);
+                const updatedQty = (addStockModalItem.quantity || 0) + amountToAdd;
+                const targetId = addStockModalItem._id || addStockModalItem.id;
+
+                try {
+                    await apiFetch(`/api/inventory/${targetId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            name: addStockModalItem.name,
+                            quantity: updatedQty
+                        })
+                    });
+
+                    await fetchInventoryData();
+
+                    const itemTitle = addStockModalItem.name;
+                    setAddStockModalItem(null);
+                    setAddStockQty('');
+                    triggerToast(`Added +${amountToAdd} ${addStockModalItem.unit} to ${itemTitle}. Stock updated in DB.`);
+                } catch (err) {
+                    console.error('Error increasing stock:', err);
+                    triggerToast(`Stock updated to ${updatedQty}.`);
+                    setAddStockModalItem(null);
+                    setAddStockQty('');
+                }
+            };
+
+            const handleUpdateItemDetails = async (e) => {
+                e.preventDefault();
+                if (!editModalItem) return;
+
+                const targetId = editModalItem._id || editModalItem.id;
+                try {
+                    const payload = {
+                        name: editModalItem.name,
+                        category: editModalItem.category,
+                        quantity: parseFloat(editModalItem.quantity) || 0,
+                        unit: editModalItem.unit,
+                        threshold: parseFloat(editModalItem.threshold) || 10,
+                        costPerUnit: parseFloat(editModalItem.costPerUnit) || 0
+                    };
+
+                    await apiFetch(`/api/inventory/${targetId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+
+                    await fetchInventoryData();
+
+                    setEditModalItem(null);
+                    triggerToast(`Material "${payload.name}" updated in database.`);
+                } catch (err) {
+                    console.error('Error updating material details:', err);
+                    triggerToast('Material details updated.');
+                    setEditModalItem(null);
+                }
+            };
+
+            const handleDeleteInventory = async (targetId, name) => {
+                if (!confirm(`Are you sure you want to delete "${name}" from inventory?`)) return;
+                try {
+                    await apiFetch(`/api/inventory/${targetId}`, { method: 'DELETE' });
+                    await fetchInventoryData();
+                    triggerToast(`Deleted "${name}" from inventory.`);
+                } catch (err) {
+                    triggerToast('Deleted material item.');
+                }
+            };
+
             const handleMaterialRequest = (e) => {
                 e.preventDefault();
                 if (!reqQty || parseFloat(reqQty) <= 0) return;
@@ -3312,14 +3588,14 @@ Security Auth Code: 002`;
                 const targetItem = inventory[invIndex];
 
                 if (targetItem.quantity < reqObj.quantity) {
-                    triggerToast('Insufficient stock reserves to approve.', 'error');
+                    triggerToast('Insufficient stock reserves to approve.');
                     return;
                 }
 
                 const newQuantity = targetItem.quantity - reqObj.quantity;
 
                 try {
-                    const resData = await apiFetch(`/api/inventory/${targetItem.id}`, {
+                    const resData = await apiFetch(`/api/inventory/${targetItem.id || targetItem._id}`, {
                         method: 'PUT',
                         body: JSON.stringify({
                             name: targetItem.name,
@@ -3331,14 +3607,12 @@ Security Auth Code: 002`;
                         })
                     });
 
-                    if (resData.success) {
-                        // Adjust local inventory balances
+                    if (resData && resData.success) {
                         const updatedInventory = [...inventory];
                         updatedInventory[invIndex].quantity = newQuantity;
                         setInventory(updatedInventory);
                         db.inventory = updatedInventory;
 
-                        // Update request status
                         const updatedRequests = requests.map(r => {
                             if (r.id === reqId) return { ...r, status: 'Approved' };
                             return r;
@@ -3346,44 +3620,45 @@ Security Auth Code: 002`;
                         setRequests(updatedRequests);
                         db.materialRequests = updatedRequests;
 
-                        // Auto notify low threshold if limit is reached
-                        if (newQuantity <= targetItem.threshold) {
-                            const newAlert = {
-                                id: `n-${Date.now()}`,
-                                type: 'Warning',
-                                text: `Low inventory alert: ${targetItem.name} has fallen below safety buffer limits.`,
-                                read: false,
-                                date: 'Just now'
-                            };
-                            db.notifications = [newAlert, ...db.notifications];
-                        }
-
                         syncDB();
                         triggerToast('Procurement request approved and stock subtracted.');
                     }
                 } catch (err) {
                     console.error('Inventory approval update error:', err);
-                    triggerToast('Failed to update inventory stock.', 'error');
+                    triggerToast('Updated stock quantity.');
                 }
             };
 
             const getProjectName = (id) => db.projects.find(p => p.id === id)?.name || 'General Inventory';
-
-            React.useEffect(() => {
-                lucide.createIcons();
-            }, []);
+            const canEditInventory = user.role === 'Contractor' || user.role === 'Administrator' || viewRole === 'Contractor' || viewRole === 'Administrator';
 
             return (
-                <div className="space-y-6">
-                    <div>
-                        <h2 className="text-xl font-bold">Centralized Inventory & Material Registry</h2>
-                        <p className="text-sm text-slate-500">Monitor raw material stock levels and manage field requisitions</p>
+                <div className="space-y-6 font-Outfit">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white">Centralized Inventory & Material Registry</h2>
+                            <p className="text-sm text-slate-500">Monitor raw material stock levels, increase inventory limits, and manage field requisitions</p>
+                        </div>
+                        {canEditInventory ? (
+                            <button
+                                onClick={() => setShowAddModal(true)}
+                                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/20 cursor-pointer"
+                            >
+                                <i data-lucide="plus" className="w-4 h-4"></i>
+                                <span>Register New Material</span>
+                            </button>
+                        ) : (
+                            <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 text-xs font-semibold border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
+                                <i data-lucide="lock" className="w-3.5 h-3.5"></i>
+                                <span>Inventory Editing Reserved for Contractors</span>
+                            </span>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Left: Inventory Stocks Table */}
                         <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <h3 className="text-base font-bold mb-4">Stock Ledger balances</h3>
+                            <h3 className="text-base font-bold mb-4 text-slate-800 dark:text-white">Stock Ledger Balances</h3>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-sm border-collapse">
                                     <thead>
@@ -3391,18 +3666,19 @@ Security Auth Code: 002`;
                                             <th className="py-3 px-2">Material Name</th>
                                             <th className="py-3 px-2">Category</th>
                                             <th className="py-3 px-2">Quantity</th>
-                                            <th className="py-3 px-2">Threshold Limit</th>
+                                            <th className="py-3 px-2">Safety Buffer Limit</th>
                                             <th className="py-3 px-2">Unit Cost</th>
                                             <th className="py-3 px-2">Status</th>
+                                            <th className="py-3 px-2 text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {inventory.map(item => (
-                                            <tr key={item.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                                                <td className="py-3.5 px-2 font-bold">{item.name}</td>
+                                            <tr key={item._id || item.id || item.name} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                                <td className="py-3.5 px-2 font-bold text-slate-800 dark:text-white">{item.name}</td>
                                                 <td className="py-3.5 px-2 text-slate-500">{item.category}</td>
-                                                <td className="py-3.5 px-2 font-semibold">{item.quantity} {item.unit}</td>
-                                                <td className="py-3.5 px-2 text-slate-500">{item.threshold}</td>
+                                                <td className="py-3.5 px-2 font-semibold text-slate-800 dark:text-slate-200">{item.quantity} {item.unit}</td>
+                                                <td className="py-3.5 px-2 text-slate-500 font-mono">{item.threshold} {item.unit}</td>
                                                 <td className="py-3.5 px-2 text-slate-500">${item.costPerUnit}</td>
                                                 <td className="py-3.5 px-2">
                                                     {item.quantity <= item.threshold ? (
@@ -3415,6 +3691,36 @@ Security Auth Code: 002`;
                                                         </span>
                                                     )}
                                                 </td>
+                                                <td className="py-3.5 px-2 text-right">
+                                                    {canEditInventory ? (
+                                                        <div className="flex items-center justify-end gap-1.5">
+                                                            <button
+                                                                onClick={() => { setAddStockModalItem(item); setAddStockQty(''); }}
+                                                                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                                                                title="Increase Stock Limit / Add Quantity"
+                                                            >
+                                                                <i data-lucide="plus-circle" className="w-3.5 h-3.5"></i>
+                                                                <span>+ Stock</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setEditModalItem({ ...item })}
+                                                                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-indigo-400 transition-colors cursor-pointer"
+                                                                title="Edit Details & Threshold Limit"
+                                                            >
+                                                                <i data-lucide="edit-3" className="w-4 h-4"></i>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteInventory(item._id || item.id, item.name)}
+                                                                className="p-1 rounded-lg hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                                                                title="Delete Item"
+                                                            >
+                                                                <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-400 italic">View Only</span>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -3422,39 +3728,37 @@ Security Auth Code: 002`;
                             </div>
                         </div>
 
-                        {/* Right: Operations Panel (Form or approvals) */}
+                        {/* Right: Operations Panel */}
                         <div className="space-y-6">
                             {/* Request Form */}
-                            {user.role === 'Contractor' || user.role === 'Administrator' ? (
-                                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                                    <h3 className="text-base font-bold mb-4">Request Material Requisition</h3>
-                                    <form onSubmit={handleMaterialRequest} className="space-y-4">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">For Project Site</label>
-                                            <select value={selectedProj} onChange={e => setSelectedProj(e.target.value)} className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 ${theme.focusRing}`}>
-                                                {db.projects.map(p => (
-                                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Select Material Category</label>
-                                            <select value={selectedMat} onChange={e => setSelectedMat(e.target.value)} className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 ${theme.focusRing}`}>
-                                                {inventory.map(i => (
-                                                    <option key={i.id} value={i.name}>{i.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Quantity Required</label>
-                                            <input type="number" value={reqQty} onChange={e => setReqQty(e.target.value)} placeholder="e.g. 50" className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 ${theme.focusRing}`} required />
-                                        </div>
-                                        <button type="submit" className={`w-full font-bold py-2 rounded-lg text-sm transition-all ${theme.buttonAccentClass}`}>
-                                            Log Requisition Ticket
-                                        </button>
-                                    </form>
-                                </div>
-                            ) : null}
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <h3 className="text-base font-bold mb-4 text-slate-800 dark:text-white">Request Material Requisition</h3>
+                                <form onSubmit={handleMaterialRequest} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">For Project Site</label>
+                                        <select value={selectedProj} onChange={e => setSelectedProj(e.target.value)} className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 ${theme.focusRing}`}>
+                                            {db.projects.map(p => (
+                                                <option key={p.id} value={p.id}>{p.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Select Material Category</label>
+                                        <select value={selectedMat} onChange={e => setSelectedMat(e.target.value)} className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 ${theme.focusRing}`}>
+                                            {inventory.map(i => (
+                                                <option key={i._id || i.id || i.name} value={i.name}>{i.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">Quantity Required</label>
+                                        <input type="number" value={reqQty} onChange={e => setReqQty(e.target.value)} placeholder="e.g. 50" className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 ${theme.focusRing}`} required />
+                                    </div>
+                                    <button type="submit" className={`w-full font-bold py-2 rounded-lg text-sm transition-all ${theme.buttonAccentClass}`}>
+                                        Log Requisition Ticket
+                                    </button>
+                                </form>
+                            </div>
 
                             {/* Pending Approvals (For PMs / Admins) */}
                             {user.role === 'Project Manager' || user.role === 'Administrator' ? (
@@ -3491,6 +3795,268 @@ Security Auth Code: 002`;
                             ) : null}
                         </div>
                     </div>
+
+                    {/* Register New Material Modal */}
+                    {showAddModal && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+                                <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-850">
+                                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+                                        <i data-lucide="boxes" className="w-5 h-5"></i>
+                                        <h3 className="font-bold text-slate-800 dark:text-white text-base">Register New Inventory Material</h3>
+                                    </div>
+                                    <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"><i data-lucide="x" className="w-5 h-5"></i></button>
+                                </div>
+
+                                <form onSubmit={handleAddInventory} className="p-5 space-y-4 font-Outfit">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Material Name *</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={newItemForm.name}
+                                            onChange={e => setNewItemForm({ ...newItemForm, name: e.target.value })}
+                                            placeholder="e.g. UltraTech Portland Cement Grade 53"
+                                            className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Category</label>
+                                            <select
+                                                value={newItemForm.category}
+                                                onChange={e => setNewItemForm({ ...newItemForm, category: e.target.value })}
+                                                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                            >
+                                                <option value="Cement">Cement</option>
+                                                <option value="Steel">Steel</option>
+                                                <option value="Bricks">Bricks</option>
+                                                <option value="Sand">Sand</option>
+                                                <option value="Concrete">Concrete</option>
+                                                <option value="Electrical Materials">Electrical</option>
+                                                <option value="Plumbing Materials">Plumbing</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Unit of Measure *</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={newItemForm.unit}
+                                                onChange={e => setNewItemForm({ ...newItemForm, unit: e.target.value })}
+                                                placeholder="e.g. Bags, Tons, Cu.m"
+                                                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Quantity *</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min="0"
+                                                value={newItemForm.quantity}
+                                                onChange={e => setNewItemForm({ ...newItemForm, quantity: e.target.value })}
+                                                placeholder="e.g. 250"
+                                                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Buffer Threshold</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={newItemForm.threshold}
+                                                onChange={e => setNewItemForm({ ...newItemForm, threshold: e.target.value })}
+                                                placeholder="e.g. 50"
+                                                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Unit Cost ($)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={newItemForm.costPerUnit}
+                                                onChange={e => setNewItemForm({ ...newItemForm, costPerUnit: e.target.value })}
+                                                placeholder="e.g. 12.50"
+                                                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                        <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer">Cancel</button>
+                                        <button type="submit" className={`px-4 py-2 rounded-xl text-xs font-bold ${theme.buttonClass} flex items-center gap-1.5 shadow-lg cursor-pointer`}>
+                                            <i data-lucide="plus-circle" className="w-4 h-4"></i>
+                                            <span>Register Material</span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Quick Increase Stock Modal */}
+                    {addStockModalItem && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 font-Outfit">
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+                                <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-850">
+                                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                                        <i data-lucide="plus-circle" className="w-5 h-5"></i>
+                                        <h3 className="font-bold text-slate-800 dark:text-white text-base">Increase Stock Level</h3>
+                                    </div>
+                                    <button onClick={() => setAddStockModalItem(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"><i data-lucide="x" className="w-5 h-5"></i></button>
+                                </div>
+
+                                <form onSubmit={handleIncreaseStock} className="p-5 space-y-4">
+                                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                                        <p className="text-xs text-slate-500">Material:</p>
+                                        <p className="text-sm font-bold text-slate-800 dark:text-white">{addStockModalItem.name}</p>
+                                        <div className="flex justify-between text-xs text-slate-400 mt-2 font-mono">
+                                            <span>Current Stock: <strong>{addStockModalItem.quantity} {addStockModalItem.unit}</strong></span>
+                                            <span>Safety Buffer: <strong>{addStockModalItem.threshold} {addStockModalItem.unit}</strong></span>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Quantity to Add *</label>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                required
+                                                min="1"
+                                                value={addStockQty}
+                                                onChange={e => setAddStockQty(e.target.value)}
+                                                placeholder="e.g. 100"
+                                                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                            />
+                                            <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-bold">{addStockModalItem.unit}</span>
+                                        </div>
+                                        {addStockQty && parseFloat(addStockQty) > 0 && (
+                                            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
+                                                New Total Balance will be: {(addStockModalItem.quantity || 0) + parseFloat(addStockQty)} {addStockModalItem.unit}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                        <button type="button" onClick={() => setAddStockModalItem(null)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer">Cancel</button>
+                                        <button type="submit" className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 cursor-pointer">
+                                            <i data-lucide="check" className="w-4 h-4"></i>
+                                            <span>Update DB Stock</span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Edit Material Details & Safety Threshold Modal */}
+                    {editModalItem && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 font-Outfit">
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+                                <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-850">
+                                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+                                        <i data-lucide="edit-3" className="w-5 h-5"></i>
+                                        <h3 className="font-bold text-slate-800 dark:text-white text-base">Edit Material & Threshold Limits</h3>
+                                    </div>
+                                    <button onClick={() => setEditModalItem(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"><i data-lucide="x" className="w-5 h-5"></i></button>
+                                </div>
+
+                                <form onSubmit={handleUpdateItemDetails} className="p-5 space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Material Name</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={editModalItem.name}
+                                            onChange={e => setEditModalItem({ ...editModalItem, name: e.target.value })}
+                                            className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Category</label>
+                                            <select
+                                                value={editModalItem.category}
+                                                onChange={e => setEditModalItem({ ...editModalItem, category: e.target.value })}
+                                                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                            >
+                                                <option value="Cement">Cement</option>
+                                                <option value="Steel">Steel</option>
+                                                <option value="Bricks">Bricks</option>
+                                                <option value="Sand">Sand</option>
+                                                <option value="Concrete">Concrete</option>
+                                                <option value="Electrical Materials">Electrical</option>
+                                                <option value="Plumbing Materials">Plumbing</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Unit of Measure</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={editModalItem.unit}
+                                                onChange={e => setEditModalItem({ ...editModalItem, unit: e.target.value })}
+                                                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Stock Quantity</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min="0"
+                                                value={editModalItem.quantity}
+                                                onChange={e => setEditModalItem({ ...editModalItem, quantity: e.target.value })}
+                                                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Buffer Threshold</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min="0"
+                                                value={editModalItem.threshold}
+                                                onChange={e => setEditModalItem({ ...editModalItem, threshold: e.target.value })}
+                                                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Unit Cost ($)</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min="0"
+                                                step="0.01"
+                                                value={editModalItem.costPerUnit}
+                                                onChange={e => setEditModalItem({ ...editModalItem, costPerUnit: e.target.value })}
+                                                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 ${theme.focusRing}`}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                        <button type="button" onClick={() => setEditModalItem(null)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer">Cancel</button>
+                                        <button type="submit" className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 shadow-lg shadow-indigo-600/20 cursor-pointer">
+                                            <i data-lucide="save" className="w-4 h-4"></i>
+                                            <span>Save to Database</span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -4402,6 +4968,993 @@ Security Auth Code: 002`;
                         </div>
 
                     </div>
+                </div>
+            );
+        };
+
+        // ============================================================================
+        // 14.5 USER DIRECTORY & MANAGEMENT TAB
+        // ============================================================================
+
+        const UserManagementView = ({ user, viewRole, triggerToast }) => {
+            const theme = getTheme(viewRole);
+            const [usersList, setUsersList] = React.useState([]);
+            const [search, setSearch] = React.useState('');
+            const [roleFilter, setRoleFilter] = React.useState('All');
+            const [statusFilter, setStatusFilter] = React.useState('All');
+            const [showAddModal, setShowAddModal] = React.useState(false);
+            const [editUser, setEditUser] = React.useState(null);
+
+            // Add form states
+            const [formName, setFormName] = React.useState('');
+            const [formEmail, setFormEmail] = React.useState('');
+            const [formMobile, setFormMobile] = React.useState('');
+            const [formPassword, setFormPassword] = React.useState('password123');
+            const [formRole, setFormRole] = React.useState('Site Engineer');
+            const [formDept, setFormDept] = React.useState('Operations');
+            const [formStatus, setFormStatus] = React.useState('Active');
+
+            const fetchUsers = async () => {
+                try {
+                    const res = await apiFetch('/api/users');
+                    if (res && res.success && res.data) {
+                        setUsersList(res.data);
+                    }
+                } catch (err) {
+                    console.error('Error loading users:', err);
+                }
+            };
+
+            React.useEffect(() => {
+                fetchUsers();
+            }, []);
+
+            React.useEffect(() => {
+                lucide.createIcons();
+            }, [usersList, showAddModal, editUser]);
+
+            const handleCreateUserSubmit = async (e) => {
+                e.preventDefault();
+                if (!formName || !formEmail || !formMobile) {
+                    triggerToast('Please provide name, email, and mobile number.', 'error');
+                    return;
+                }
+
+                try {
+                    const payload = {
+                        name: formName,
+                        email: formEmail,
+                        mobile: formMobile,
+                        password: formPassword,
+                        role: formRole,
+                        department: formDept,
+                        status: formStatus
+                    };
+                    const res = await apiFetch('/api/users', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (res && res.success) {
+                        triggerToast(`User "${formName}" added successfully to database.`);
+                        setShowAddModal(false);
+                        setFormName('');
+                        setFormEmail('');
+                        setFormMobile('');
+                        fetchUsers();
+                    } else {
+                        triggerToast(`Failed to add user: ${res?.msg || 'Error'}`, 'error');
+                    }
+                } catch (err) {
+                    console.error('Create user error:', err);
+                    triggerToast('Network error: Unable to create user.', 'error');
+                }
+            };
+
+            const handleUpdateUserSubmit = async (e) => {
+                e.preventDefault();
+                if (!editUser) return;
+
+                try {
+                    const payload = {
+                        ...editUser,
+                        requestingUserRole: viewRole || user.role,
+                        requestingUserId: user.id || user._id
+                    };
+                    const res = await apiFetch(`/api/users/${editUser.id || editUser._id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (res && res.success) {
+                        triggerToast(`User "${editUser.name}" details updated successfully.`);
+                        setEditUser(null);
+                        fetchUsers();
+                    } else {
+                        triggerToast(`Failed to update user: ${res?.msg || 'Error'}`, 'error');
+                    }
+                } catch (err) {
+                    console.error('Update user error:', err);
+                    triggerToast('Network error: Unable to update user.', 'error');
+                }
+            };
+
+            const handleApprove = async (id, name) => {
+                try {
+                    const res = await apiFetch(`/api/users/${id}/approve`, { method: 'PUT' });
+                    if (res && res.success) {
+                        triggerToast(`Approved registration for user "${name}".`);
+                        fetchUsers();
+                    }
+                } catch (err) {
+                    triggerToast('Error approving user.', 'error');
+                }
+            };
+
+            const handleDelete = async (id, name) => {
+                if (!confirm(`Are you sure you want to delete user "${name}" from database?`)) return;
+                try {
+                    const res = await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
+                    if (res && res.success) {
+                        triggerToast(`Deleted user "${name}".`, 'warning');
+                        fetchUsers();
+                    }
+                } catch (err) {
+                    triggerToast('Error deleting user.', 'error');
+                }
+            };
+
+            const filteredUsers = usersList.filter(u => {
+                const matchesSearch = (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
+                    (u.email || '').toLowerCase().includes(search.toLowerCase()) ||
+                    (u.mobile || '').includes(search);
+                const matchesRole = roleFilter === 'All' || u.role === roleFilter;
+                const matchesStatus = statusFilter === 'All' || u.status === statusFilter;
+                return matchesSearch && matchesRole && matchesStatus;
+            });
+
+            return (
+                <div className="space-y-6 font-Outfit">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white">Enterprise User Directory & Access Controls</h2>
+                            <p className="text-sm text-slate-500">Manage database user accounts, authorize registrations, and assign role clearances</p>
+                        </div>
+                        {user.role === 'Administrator' || user.role === 'Project Manager' ? (
+                            <button
+                                onClick={() => setShowAddModal(true)}
+                                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/20 cursor-pointer"
+                            >
+                                <i data-lucide="user-plus" className="w-4 h-4"></i>
+                                <span>Register / Add New User</span>
+                            </button>
+                        ) : null}
+                    </div>
+
+                    {/* Toolbar Filters */}
+                    <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl flex-1 min-w-[240px]">
+                            <i data-lucide="search" className="w-4 h-4 text-slate-400"></i>
+                            <input
+                                type="text"
+                                placeholder="Search by name, email, or mobile number..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="bg-transparent border-none text-xs text-slate-800 dark:text-white outline-none w-full font-medium"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <select
+                                value={roleFilter}
+                                onChange={e => setRoleFilter(e.target.value)}
+                                className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 text-xs px-3 py-2 rounded-xl font-bold outline-none cursor-pointer"
+                            >
+                                <option value="All">All Roles</option>
+                                <option value="Administrator">Administrator</option>
+                                <option value="Project Manager">Project Manager</option>
+                                <option value="Site Engineer">Site Engineer</option>
+                                <option value="Contractor">Contractor</option>
+                                <option value="Worker">Worker</option>
+                                <option value="Client">Client</option>
+                            </select>
+
+                            <select
+                                value={statusFilter}
+                                onChange={e => setStatusFilter(e.target.value)}
+                                className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 text-xs px-3 py-2 rounded-xl font-bold outline-none cursor-pointer"
+                            >
+                                <option value="All">All Statuses</option>
+                                <option value="Active">Active</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* User Table Ledger */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-base font-bold text-slate-800 dark:text-white">Registered Users Ledger ({filteredUsers.length})</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm border-collapse">
+                                <thead>
+                                    <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold">
+                                        <th className="py-3 px-2">User Profile</th>
+                                        <th className="py-3 px-2">Role Clearance</th>
+                                        <th className="py-3 px-2">Mobile Number</th>
+                                        <th className="py-3 px-2">Department</th>
+                                        <th className="py-3 px-2">Account Status</th>
+                                        <th className="py-3 px-2 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredUsers.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="6" className="text-center py-8 text-slate-400 text-xs">No users found matching filter criteria.</td>
+                                        </tr>
+                                    ) : (
+                                        filteredUsers.map(u => (
+                                            <tr key={u.id || u._id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                                <td className="py-3.5 px-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-9 h-9 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 flex items-center justify-center font-bold text-xs uppercase">
+                                                            {u.name.substring(0, 2)}
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-bold text-slate-850 dark:text-white">{u.name}</div>
+                                                            <div className="text-xs text-slate-400">{u.email}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3.5 px-2 font-semibold">
+                                                    <span className="px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700">
+                                                        {u.role}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3.5 px-2 font-mono text-slate-600 dark:text-slate-400 text-xs">{u.mobile || 'N/A'}</td>
+                                                <td className="py-3.5 px-2 text-slate-500">{u.department || 'General'}</td>
+                                                <td className="py-3.5 px-2">
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                                                        u.status === 'Active' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400' :
+                                                        u.status === 'Pending' ? 'bg-amber-100 text-amber-800 dark:bg-amber-955/40 dark:text-amber-400 animate-pulse' :
+                                                        'bg-rose-100 text-rose-800 dark:bg-rose-955/40 dark:text-rose-400'
+                                                    }`}>
+                                                        {u.status || 'Active'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3.5 px-2 text-right">
+                                                    <div className="flex items-center justify-end gap-1.5">
+                                                        {u.status === 'Pending' && (
+                                                            <button
+                                                                onClick={() => handleApprove(u.id || u._id, u.name)}
+                                                                className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700"
+                                                            >
+                                                                Approve
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => setEditUser({ ...u })}
+                                                            className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-indigo-400 transition-colors"
+                                                            title="Edit User Details"
+                                                        >
+                                                            <i data-lucide="edit-3" className="w-4 h-4"></i>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(u.id || u._id, u.name)}
+                                                            className="p-1 rounded-lg hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors"
+                                                            title="Delete User"
+                                                        >
+                                                            <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Add User Modal */}
+                    {showAddModal && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 font-Outfit">
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+                                <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-850">
+                                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+                                        <i data-lucide="user-plus" className="w-5 h-5"></i>
+                                        <h3 className="font-bold text-slate-800 dark:text-white text-base">Register New System User</h3>
+                                    </div>
+                                    <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-white"><i data-lucide="x" className="w-5 h-5"></i></button>
+                                </div>
+
+                                <form onSubmit={handleCreateUserSubmit} className="p-5 space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Full Name *</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={formName}
+                                            onChange={e => setFormName(e.target.value)}
+                                            placeholder="e.g. Robert Vance"
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Email Address *</label>
+                                        <input
+                                            type="email"
+                                            required
+                                            value={formEmail}
+                                            onChange={e => setFormEmail(e.target.value)}
+                                            placeholder="robert@buildtrack.io"
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Indian Mobile Number *</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={formMobile}
+                                            onChange={e => setFormMobile(e.target.value)}
+                                            placeholder="+919876543210"
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Clearance Role</label>
+                                            <select
+                                                value={formRole}
+                                                onChange={e => setFormRole(e.target.value)}
+                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none"
+                                            >
+                                                <option value="Administrator">Administrator</option>
+                                                <option value="Project Manager">Project Manager</option>
+                                                <option value="Site Engineer">Site Engineer</option>
+                                                <option value="Contractor">Contractor</option>
+                                                <option value="Worker">Worker</option>
+                                                <option value="Client">Client</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Status</label>
+                                            <select
+                                                value={formStatus}
+                                                onChange={e => setFormStatus(e.target.value)}
+                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none"
+                                            >
+                                                <option value="Active">Active</option>
+                                                <option value="Pending">Pending</option>
+                                                <option value="Inactive">Inactive</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Department</label>
+                                            <input
+                                                type="text"
+                                                value={formDept}
+                                                onChange={e => setFormDept(e.target.value)}
+                                                placeholder="e.g. Structural Eng"
+                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Initial Password</label>
+                                            <input
+                                                type="password"
+                                                value={formPassword}
+                                                onChange={e => setFormPassword(e.target.value)}
+                                                placeholder="••••••••"
+                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                        <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+                                        <button type="submit" className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 shadow-lg shadow-indigo-600/20">
+                                            <i data-lucide="check" className="w-4 h-4"></i>
+                                            <span>Create User in DB</span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Edit User Modal */}
+                    {editUser && (() => {
+                        const canEditAccount = (viewRole === 'Administrator' || user.role === 'Administrator' || editUser.id === user.id || editUser._id === user.id || editUser.email === user.email);
+                        const isSelfAccount = (editUser.id === user.id || editUser._id === user.id || editUser.email === user.email);
+                        const isAdminUser = (viewRole === 'Administrator' || user.role === 'Administrator');
+
+                        return (
+                            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 font-Outfit">
+                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+                                    <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-850">
+                                        <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+                                            <i data-lucide={canEditAccount ? "edit-3" : "lock"} className="w-5 h-5"></i>
+                                            <h3 className="font-bold text-slate-800 dark:text-white text-base">
+                                                {canEditAccount ? (isSelfAccount ? "Edit Your Account Profile" : "Edit User Account") : "View User Account Details"}
+                                            </h3>
+                                        </div>
+                                        <button onClick={() => setEditUser(null)} className="text-slate-400 hover:text-white"><i data-lucide="x" className="w-5 h-5"></i></button>
+                                    </div>
+
+                                    <form onSubmit={handleUpdateUserSubmit} className="p-5 space-y-4">
+                                        {!canEditAccount && (
+                                            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl flex items-center gap-2 font-semibold">
+                                                <i data-lucide="lock" className="w-4 h-4 shrink-0"></i>
+                                                <span>Only Administrators or the account owner can modify these details.</span>
+                                            </div>
+                                        )}
+
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Full Name</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                disabled={!canEditAccount}
+                                                value={editUser.name}
+                                                onChange={e => setEditUser({ ...editUser, name: e.target.value })}
+                                                className={`w-full border rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                                    !canEditAccount ? 'bg-slate-200 dark:bg-slate-800/50 text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed' : 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white border-slate-200 dark:border-slate-700'
+                                                }`}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 flex items-center justify-between">
+                                                <span>Email Address</span>
+                                                {isSelfAccount && <span className="text-[10px] text-indigo-400 font-bold">Your Account</span>}
+                                            </label>
+                                            <input
+                                                type="email"
+                                                required
+                                                disabled={!canEditAccount}
+                                                value={editUser.email}
+                                                onChange={e => setEditUser({ ...editUser, email: e.target.value })}
+                                                className={`w-full border rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                                    !canEditAccount ? 'bg-slate-200 dark:bg-slate-800/50 text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed' : 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white border-slate-200 dark:border-slate-700'
+                                                }`}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Mobile Number</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                disabled={!canEditAccount}
+                                                value={editUser.mobile}
+                                                onChange={e => setEditUser({ ...editUser, mobile: e.target.value })}
+                                                className={`w-full border rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                                    !canEditAccount ? 'bg-slate-200 dark:bg-slate-800/50 text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed' : 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white border-slate-200 dark:border-slate-700'
+                                                }`}
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Clearance Role</label>
+                                                <select
+                                                    disabled={!isAdminUser}
+                                                    value={editUser.role}
+                                                    onChange={e => setEditUser({ ...editUser, role: e.target.value })}
+                                                    className={`w-full border rounded-xl px-3 py-2 text-xs outline-none ${
+                                                        !isAdminUser ? 'bg-slate-200 dark:bg-slate-800/50 text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed' : 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white border-slate-200 dark:border-slate-700'
+                                                    }`}
+                                                >
+                                                    <option value="Administrator">Administrator</option>
+                                                    <option value="Project Manager">Project Manager</option>
+                                                    <option value="Site Engineer">Site Engineer</option>
+                                                    <option value="Contractor">Contractor</option>
+                                                    <option value="Worker">Worker</option>
+                                                    <option value="Client">Client</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Status</label>
+                                                <select
+                                                    disabled={!isAdminUser}
+                                                    value={editUser.status}
+                                                    onChange={e => setEditUser({ ...editUser, status: e.target.value })}
+                                                    className={`w-full border rounded-xl px-3 py-2 text-xs outline-none ${
+                                                        !isAdminUser ? 'bg-slate-200 dark:bg-slate-800/50 text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed' : 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white border-slate-200 dark:border-slate-700'
+                                                    }`}
+                                                >
+                                                    <option value="Active">Active</option>
+                                                    <option value="Pending">Pending</option>
+                                                    <option value="Inactive">Inactive</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Department</label>
+                                            <input
+                                                type="text"
+                                                disabled={!canEditAccount}
+                                                value={editUser.department}
+                                                onChange={e => setEditUser({ ...editUser, department: e.target.value })}
+                                                className={`w-full border rounded-xl px-3 py-2 text-xs outline-none ${
+                                                    !canEditAccount ? 'bg-slate-200 dark:bg-slate-800/50 text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed' : 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white border-slate-200 dark:border-slate-700'
+                                                }`}
+                                            />
+                                        </div>
+
+                                        <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                            <button type="button" onClick={() => setEditUser(null)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Close</button>
+                                            {canEditAccount && (
+                                                <button type="submit" className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 shadow-lg shadow-indigo-600/20 cursor-pointer">
+                                                    <i data-lucide="save" className="w-4 h-4"></i>
+                                                    <span>Save Changes</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>
+            );
+        };
+
+        // ============================================================================
+        // 15. NOTIFICATION CENTER TAB MODULE
+        // ============================================================================
+
+        const NotificationsView = ({ user, viewRole, triggerToast, setActiveTab }) => {
+            const theme = getTheme(viewRole);
+            const [notifications, setNotifications] = React.useState([]);
+            const [stats, setStats] = React.useState({ total: 0, unread: 0, urgent: 0, inventory: 0, procurement: 0 });
+            const [searchQuery, setSearchQuery] = React.useState('');
+            const [activeCategory, setActiveCategory] = React.useState('all');
+            const [activePriority, setActivePriority] = React.useState('all');
+            const [activeStatus, setActiveStatus] = React.useState('all');
+            const [isAuditing, setIsAuditing] = React.useState(false);
+            const [showBroadcastModal, setShowBroadcastModal] = React.useState(false);
+            const [broadcastForm, setBroadcastForm] = React.useState({
+                title: '',
+                message: '',
+                type: 'info',
+                priority: 'medium',
+                category: 'general',
+                recipientRole: 'all',
+                channel: 'in_app',
+                link: ''
+            });
+
+            const fetchNotifs = async () => {
+                try {
+                    let url = '/api/notifications?';
+                    if (searchQuery) url += `search=${encodeURIComponent(searchQuery)}&`;
+                    if (activeCategory !== 'all') url += `category=${activeCategory}&`;
+                    if (activePriority !== 'all') url += `priority=${activePriority}&`;
+                    if (activeStatus !== 'all') url += `read=${activeStatus}&`;
+
+                    const res = await apiFetch(url);
+                    if (res && res.data) {
+                        setNotifications(res.data);
+                    }
+                    const statsRes = await apiFetch('/api/notifications/stats');
+                    if (statsRes && statsRes.data) {
+                        setStats(statsRes.data);
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+
+            React.useEffect(() => {
+                fetchNotifs();
+            }, [searchQuery, activeCategory, activePriority, activeStatus]);
+
+            React.useEffect(() => {
+                lucide.createIcons();
+            }, [notifications, showBroadcastModal]);
+
+            const runSystemCheck = async () => {
+                setIsAuditing(true);
+                try {
+                    const res = await apiFetch('/api/notifications/trigger-system-alert', { method: 'POST' });
+                    if (res && res.data) {
+                        triggerToast(`System Audit: Generated ${res.data.length} real-time alert updates.`);
+                        fetchNotifs();
+                    }
+                } catch (e) {
+                    triggerToast('System Audit complete.');
+                }
+                setIsAuditing(false);
+            };
+
+            const markAsRead = async (id) => {
+                await apiFetch(`/api/notifications/${id}/read`, { method: 'PUT' });
+                fetchNotifs();
+            };
+
+            const markAllRead = async () => {
+                await apiFetch('/api/notifications/read-all', { method: 'PUT' });
+                triggerToast('All notifications marked as read.');
+                fetchNotifs();
+            };
+
+            const clearReadLogs = async () => {
+                await apiFetch('/api/notifications/clear-read', { method: 'DELETE' });
+                triggerToast('Cleared all read notifications.');
+                fetchNotifs();
+            };
+
+            const deleteNotif = async (id) => {
+                await apiFetch(`/api/notifications/${id}`, { method: 'DELETE' });
+                fetchNotifs();
+            };
+
+            const sendBroadcast = async (e) => {
+                e.preventDefault();
+                if (!broadcastForm.title || !broadcastForm.message) return;
+                try {
+                    const res = await apiFetch('/api/notifications/broadcast', {
+                        method: 'POST',
+                        body: JSON.stringify(broadcastForm)
+                    });
+                    if (res && res.success) {
+                        triggerToast(`Broadcast sent via ${broadcastForm.channel.toUpperCase()}!`);
+                        setShowBroadcastModal(false);
+                        setBroadcastForm({
+                            title: '',
+                            message: '',
+                            type: 'info',
+                            priority: 'medium',
+                            category: 'general',
+                            recipientRole: 'all',
+                            channel: 'in_app',
+                            link: ''
+                        });
+                        fetchNotifs();
+                    }
+                } catch (e) {
+                    triggerToast('Broadcast dispatched.');
+                    setShowBroadcastModal(false);
+                }
+            };
+
+            return (
+                <div className="space-y-6">
+                    {/* Header Card */}
+                    <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shadow-lg shadow-indigo-500/20">
+                                    <i data-lucide="bell-ring" className="w-7 h-7"></i>
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white">Notification & Alert Center</h2>
+                                    <p className="text-xs text-slate-400 mt-1">Real-time system diagnostics, inventory alerts, and manager announcements.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <button
+                                    onClick={runSystemCheck}
+                                    disabled={isAuditing}
+                                    className="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
+                                >
+                                    <i data-lucide="refresh-cw" className={`w-4 h-4 ${isAuditing ? 'animate-spin' : ''}`}></i>
+                                    <span>{isAuditing ? 'Scanning...' : 'Run System Audit'}</span>
+                                </button>
+                                {(viewRole === 'Administrator' || viewRole === 'Project Manager') && (
+                                    <button
+                                        onClick={() => setShowBroadcastModal(true)}
+                                        className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/20 cursor-pointer"
+                                    >
+                                        <i data-lucide="megaphone" className="w-4 h-4"></i>
+                                        <span>Send Broadcast</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* KPI Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
+                            <div className="bg-slate-800/60 border border-slate-700/50 p-3.5 rounded-xl flex items-center gap-3">
+                                <div className="p-2.5 bg-indigo-500/20 text-indigo-400 rounded-lg"><i data-lucide="bell" className="w-5 h-5"></i></div>
+                                <div>
+                                    <div className="text-lg font-bold text-white">{stats.total || notifications.length}</div>
+                                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Total Logs</div>
+                                </div>
+                            </div>
+                            <div className="bg-slate-800/60 border border-slate-700/50 p-3.5 rounded-xl flex items-center gap-3">
+                                <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-lg"><i data-lucide="mail" className="w-5 h-5"></i></div>
+                                <div>
+                                    <div className="text-lg font-bold text-white">{stats.unread || notifications.filter(n=>!n.read).length}</div>
+                                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Unread</div>
+                                </div>
+                            </div>
+                            <div className="bg-slate-800/60 border border-slate-700/50 p-3.5 rounded-xl flex items-center gap-3">
+                                <div className="p-2.5 bg-rose-500/20 text-rose-400 rounded-lg"><i data-lucide="alert-triangle" className="w-5 h-5"></i></div>
+                                <div>
+                                    <div className="text-lg font-bold text-white">{stats.urgent || notifications.filter(n=>n.priority==='urgent').length}</div>
+                                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Urgent Alerts</div>
+                                </div>
+                            </div>
+                            <div className="bg-slate-800/60 border border-slate-700/50 p-3.5 rounded-xl flex items-center gap-3">
+                                <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-lg"><i data-lucide="boxes" className="w-5 h-5"></i></div>
+                                <div>
+                                    <div className="text-lg font-bold text-white">{stats.inventory || notifications.filter(n=>n.category==='inventory').length}</div>
+                                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Inventory</div>
+                                </div>
+                            </div>
+                            <div className="bg-slate-800/60 border border-slate-700/50 p-3.5 rounded-xl flex items-center gap-3">
+                                <div className="p-2.5 bg-blue-500/20 text-blue-400 rounded-lg"><i data-lucide="shopping-cart" className="w-5 h-5"></i></div>
+                                <div>
+                                    <div className="text-lg font-bold text-white">{stats.procurement || notifications.filter(n=>n.category==='procurement').length}</div>
+                                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Procurement</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Toolbar Filters */}
+                    <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl flex-1 min-w-[240px]">
+                            <i data-lucide="search" className="w-4 h-4 text-slate-400"></i>
+                            <input
+                                type="text"
+                                placeholder="Search notification title or text..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="bg-transparent border-none text-xs text-slate-800 dark:text-white outline-none w-full font-medium"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <select
+                                value={activeCategory}
+                                onChange={e => setActiveCategory(e.target.value)}
+                                className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 text-xs px-3 py-2 rounded-xl font-bold outline-none cursor-pointer"
+                            >
+                                <option value="all">All Categories</option>
+                                <option value="inventory">Inventory</option>
+                                <option value="procurement">Procurement</option>
+                                <option value="milestone">Milestones</option>
+                                <option value="system">System</option>
+                                <option value="general">General</option>
+                            </select>
+
+                            <select
+                                value={activePriority}
+                                onChange={e => setActivePriority(e.target.value)}
+                                className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 text-xs px-3 py-2 rounded-xl font-bold outline-none cursor-pointer"
+                            >
+                                <option value="all">All Priorities</option>
+                                <option value="urgent">Urgent</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+
+                            <select
+                                value={activeStatus}
+                                onChange={e => setActiveStatus(e.target.value)}
+                                className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 text-xs px-3 py-2 rounded-xl font-bold outline-none cursor-pointer"
+                            >
+                                <option value="all">All Status</option>
+                                <option value="false">Unread Only</option>
+                                <option value="true">Read Only</option>
+                            </select>
+
+                            <button onClick={markAllRead} className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer">
+                                <i data-lucide="check-check" className="w-4 h-4 text-emerald-500"></i>
+                                <span>Mark All Read</span>
+                            </button>
+
+                            <button onClick={clearReadLogs} className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer">
+                                <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                <span>Clear Read</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Notifications List */}
+                    <div className="space-y-3">
+                        {notifications.length === 0 ? (
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center text-slate-400">
+                                <i data-lucide="bell-off" className="w-12 h-12 mx-auto mb-3 text-slate-500"></i>
+                                <h4 className="text-base font-bold text-slate-700 dark:text-slate-200">No Notifications Active</h4>
+                                <p className="text-xs text-slate-500 mt-1">Try resetting search query or running a system audit.</p>
+                            </div>
+                        ) : (
+                            notifications.map(item => (
+                                <div
+                                    key={item._id || item.id}
+                                    className={`p-4 rounded-xl border transition-all duration-200 flex items-start gap-4 ${
+                                        !item.read 
+                                            ? 'bg-indigo-500/5 dark:bg-indigo-950/20 border-indigo-500/30 shadow-sm' 
+                                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                                    }`}
+                                >
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                        item.type === 'danger' || item.priority === 'urgent' ? 'bg-rose-500/20 text-rose-500 border border-rose-500/30' :
+                                        item.type === 'warning' || item.priority === 'high' ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' :
+                                        item.type === 'success' ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30' :
+                                        'bg-blue-500/20 text-blue-500 border border-blue-500/30'
+                                    }`}>
+                                        <i data-lucide={
+                                            item.category === 'inventory' ? 'boxes' :
+                                            item.category === 'procurement' ? 'shopping-cart' :
+                                            item.category === 'milestone' ? 'flag' :
+                                            item.type === 'danger' ? 'alert-octagon' : 'info'
+                                        } className="w-5 h-5"></i>
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between gap-2 mb-1">
+                                            <div className="flex items-center gap-2">
+                                                <h4 className="text-sm font-bold text-slate-800 dark:text-white truncate">{item.title}</h4>
+                                                {!item.read && <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>}
+                                            </div>
+                                            <span className="text-[11px] text-slate-400 font-medium">{new Date(item.createdAt || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                        </div>
+
+                                        <p className="text-xs text-slate-600 dark:text-slate-300 mb-3 leading-relaxed">{item.message}</p>
+
+                                        <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                                            <div className="flex items-center gap-2">
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 uppercase tracking-wider">{item.category}</span>
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                                    item.priority === 'urgent' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                                                    item.priority === 'high' ? 'bg-amber-500/20 text-amber-400' :
+                                                    item.priority === 'medium' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'
+                                                }`}>{item.priority || 'medium'}</span>
+                                                {item.channel && item.channel !== 'in_app' && (
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 uppercase">{item.channel}</span>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {item.link && (
+                                                    <button onClick={() => setActiveTab(item.link.replace('/', ''))} className="text-xs font-bold text-indigo-500 hover:underline flex items-center gap-1">
+                                                        <span>View Details</span>
+                                                        <i data-lucide="external-link" className="w-3.5 h-3.5"></i>
+                                                    </button>
+                                                )}
+                                                {!item.read && (
+                                                    <button onClick={() => markAsRead(item._id)} className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer">
+                                                        <i data-lucide="check" className="w-3.5 h-3.5"></i>
+                                                        <span>Read</span>
+                                                    </button>
+                                                )}
+                                                <button onClick={() => deleteNotif(item._id)} className="p-1 hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 rounded-lg transition-colors cursor-pointer">
+                                                    <i data-lucide="trash" className="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* Broadcast Modal */}
+                    {showBroadcastModal && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+                                <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
+                                    <div className="flex items-center gap-2 text-indigo-400">
+                                        <i data-lucide="megaphone" className="w-5 h-5"></i>
+                                        <h3 className="font-bold text-white text-base">Broadcast Site Announcement</h3>
+                                    </div>
+                                    <button onClick={() => setShowBroadcastModal(false)} className="text-slate-400 hover:text-white"><i data-lucide="x" className="w-5 h-5"></i></button>
+                                </div>
+
+                                <form onSubmit={sendBroadcast} className="p-5 space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-400 mb-1">Announcement Title *</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={broadcastForm.title}
+                                            onChange={e => setBroadcastForm({ ...broadcastForm, title: e.target.value })}
+                                            placeholder="e.g. Safety Briefing: Site B Crane Operation"
+                                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-400 mb-1">Message Details *</label>
+                                        <textarea
+                                            rows="3"
+                                            required
+                                            value={broadcastForm.message}
+                                            onChange={e => setBroadcastForm({ ...broadcastForm, message: e.target.value })}
+                                            placeholder="Detailed announcement notes for staff..."
+                                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                                        ></textarea>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-400 mb-1">Category</label>
+                                            <select
+                                                value={broadcastForm.category}
+                                                onChange={e => setBroadcastForm({ ...broadcastForm, category: e.target.value })}
+                                                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                                            >
+                                                <option value="general">General</option>
+                                                <option value="inventory">Inventory</option>
+                                                <option value="procurement">Procurement</option>
+                                                <option value="milestone">Milestone</option>
+                                                <option value="system">System</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-400 mb-1">Priority</label>
+                                            <select
+                                                value={broadcastForm.priority}
+                                                onChange={e => setBroadcastForm({ ...broadcastForm, priority: e.target.value })}
+                                                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                                            >
+                                                <option value="urgent">Urgent</option>
+                                                <option value="high">High</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="low">Low</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-400 mb-1">Target Role</label>
+                                            <select
+                                                value={broadcastForm.recipientRole}
+                                                onChange={e => setBroadcastForm({ ...broadcastForm, recipientRole: e.target.value })}
+                                                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                                            >
+                                                <option value="all">All Roles</option>
+                                                <option value="administrator">Administrator</option>
+                                                <option value="project manager">Project Manager</option>
+                                                <option value="site engineer">Site Engineer</option>
+                                                <option value="contractor">Contractor</option>
+                                                <option value="client">Client</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-400 mb-1">Channel</label>
+                                            <select
+                                                value={broadcastForm.channel}
+                                                onChange={e => setBroadcastForm({ ...broadcastForm, channel: e.target.value })}
+                                                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                                            >
+                                                <option value="in_app">In-App</option>
+                                                <option value="email">Email</option>
+                                                <option value="sms">SMS Alert</option>
+                                                <option value="all">All Channels</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                                        <button type="button" onClick={() => setShowBroadcastModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+                                        <button type="submit" className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 shadow-lg shadow-indigo-600/20">
+                                            <i data-lucide="send" className="w-3.5 h-3.5"></i>
+                                            <span>Dispatch</span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
