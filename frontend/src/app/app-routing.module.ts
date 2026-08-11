@@ -12,6 +12,7 @@ import { AttendanceComponent } from './components/attendance/attendance.componen
 import { ProcurementComponent } from './components/procurement/procurement.component';
 import { ReportsComponent } from './components/reports/reports.component';
 import { NotificationsComponent } from './components/notifications/notifications.component';
+import { DocumentsComponent } from './components/documents/documents.component';
 import { AuthGuard } from './guards/auth.guard';
 
 const routes: Routes = [
@@ -55,6 +56,11 @@ const routes: Routes = [
   { 
     path: 'reports', 
     component: ReportsComponent, 
+    canActivate: [AuthGuard] 
+  },
+  { 
+    path: 'documents', 
+    component: DocumentsComponent, 
     canActivate: [AuthGuard] 
   },
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },

@@ -398,6 +398,7 @@ export class AppComponent implements OnInit, OnDestroy {
     { label: 'Inventory', icon: 'inventory_2', link: '/inventory', roles: ['Administrator', 'Project Manager', 'Contractor'] },
     { label: 'Attendance', icon: 'assignment_turned_in', link: '/attendance', roles: ['Administrator', 'Project Manager', 'Site Engineer', 'Contractor'] },
     { label: 'Procurement', icon: 'shopping_cart', link: '/procurement', roles: ['Administrator', 'Project Manager', 'Contractor'] },
+    { label: 'Documents', icon: 'folder', link: '/documents', roles: ['Administrator', 'Project Manager', 'Site Engineer', 'Contractor', 'Client'] },
     { label: 'Reports & Audits', icon: 'bar_chart', link: '/reports', roles: ['Administrator', 'Project Manager', 'Site Engineer', 'Contractor', 'Client'] }
   ];
 

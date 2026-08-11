@@ -32,6 +32,7 @@ import { ProcurementComponent } from './components/procurement/procurement.compo
 import { NotificationDrawerComponent } from './components/notification-drawer/notification-drawer.component';
 import { NotificationsComponent } from './components/notifications/notifications.component';
 import { ReportsComponent } from './components/reports/reports.component';
+import { DocumentsComponent } from './components/documents/documents.component';
 
 // Services & Guards
 import { AuthService } from './services/auth.service';
@@ -39,6 +40,7 @@ import { ProjectService } from './services/project.service';
 import { AnalyticsService } from './services/analytics.service';
 import { ReportingService } from './services/reporting.service';
 import { NotificationService } from './services/notification.service';
+import { DocumentService } from './services/document.service';
 import { TokenInterceptor } from './services/token.interceptor';
 import { AuthGuard } from './guards/auth.guard';
 
@@ -55,7 +57,8 @@ import { AuthGuard } from './guards/auth.guard';
     ProcurementComponent,
     NotificationDrawerComponent,
     NotificationsComponent,
-    ReportsComponent
+    ReportsComponent,
+    DocumentsComponent
   ],
   imports: [
     BrowserModule,
@@ -83,6 +86,7 @@ import { AuthGuard } from './guards/auth.guard';
     AnalyticsService,
     ReportingService,
     NotificationService,
+    DocumentService,
     AuthGuard,
     {
       provide: HTTP_INTERCEPTORS,

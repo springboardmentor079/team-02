@@ -145,6 +145,8 @@ const sendEmail = async (to, subject, text, html) => {
 };
 
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const app = express();
 
 // Standard middlewares
@@ -154,6 +156,53 @@ app.use(cors());
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('dev'));
 app.use(express.static(path.join(__dirname, '..')));
+
+// Document Management: ensure upload directory exists & serve stored files
+const documentsUploadDir = path.join(__dirname, 'uploads', 'documents');
+if (!fs.existsSync(documentsUploadDir)) {
+  fs.mkdirSync(documentsUploadDir, { recursive: true });
+}
+app.use('/uploads/documents', express.static(documentsUploadDir));
+
+const documentStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, documentsUploadDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const safeOriginal = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `${uniqueSuffix}-${safeOriginal}`);
+  }
+});
+
+const allowedDocumentTypes = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'text/plain',
+  'application/zip',
+  'application/dwg',
+  'image/vnd.dwg',
+  'application/acad',
+  'application/octet-stream'
+];
+
+const uploadDocument = multer({
+  storage: documentStorage,
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB cap
+  fileFilter: (req, file, cb) => {
+    if (allowedDocumentTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Unsupported file type'));
+    }
+  }
+});
 
 const { protect } = require('./middleware/auth');
 
@@ -189,6 +238,7 @@ const Procurement = require('./models/Procurement');
 const Budget = require('./models/Budget');
 const DailyLog = require('./models/DailyLog');
 const Notification = require('./models/Notification');
+const Document = require('./models/Document');
 
 
 // 1. JWT AUTH & USER MANAGEMENT
@@ -1592,6 +1642,117 @@ app.get('/api/reports/data', async (req, res) => {
   }
 });
 
+
+// 17. DOCUMENT MANAGEMENT API
+// List documents (optionally filtered by project and/or category)
+app.get('/api/documents', async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.projectId) filter.projectId = req.query.projectId;
+    if (req.query.category && req.query.category !== 'all') filter.category = req.query.category;
+
+    const documents = await Document.find(filter)
+      .populate('projectId', 'name')
+      .populate('uploadedBy', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, count: documents.length, data: documents });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Upload a new document
+app.post('/api/documents', (req, res) => {
+  uploadDocument.single('file')(req, res, async (uploadErr) => {
+    if (uploadErr) {
+      return res.status(400).json({ success: false, error: uploadErr.message });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Please attach a file to upload' });
+    }
+
+    try {
+      const { title, description, category, projectId } = req.body;
+
+      const doc = await Document.create({
+        title: title || req.file.originalname,
+        description: description || '',
+        category: category || 'Other',
+        projectId: projectId || null,
+        originalName: req.file.originalname,
+        storedFileName: req.file.filename,
+        fileType: req.file.mimetype,
+        fileSize: req.file.size,
+        uploadedBy: req.user._id
+      });
+
+      const populatedDoc = await Document.findById(doc._id)
+        .populate('projectId', 'name')
+        .populate('uploadedBy', 'name email');
+
+      res.status(201).json({ success: true, data: populatedDoc });
+    } catch (err) {
+      // Roll back the stored file if the DB record could not be created
+      fs.unlink(path.join(documentsUploadDir, req.file.filename), () => {});
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+});
+
+// Update document metadata (title, description, category, project link)
+app.put('/api/documents/:id', async (req, res) => {
+  try {
+    const { title, description, category, projectId } = req.body;
+    const updates = {};
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description;
+    if (category !== undefined) updates.category = category;
+    if (projectId !== undefined) updates.projectId = projectId || null;
+
+    const doc = await Document.findByIdAndUpdate(req.params.id, updates, {
+      new: true,
+      runValidators: true
+    }).populate('projectId', 'name').populate('uploadedBy', 'name email');
+
+    if (!doc) return res.status(404).json({ success: false, msg: 'Document not found' });
+    res.status(200).json({ success: true, data: doc });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Download the stored file for a document
+app.get('/api/documents/:id/download', async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ success: false, msg: 'Document not found' });
+
+    const filePath = path.join(documentsUploadDir, doc.storedFileName);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, msg: 'Stored file is missing from disk' });
+    }
+
+    res.download(filePath, doc.originalName);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Delete a document (removes DB record and stored file)
+app.delete('/api/documents/:id', async (req, res) => {
+  try {
+    const doc = await Document.findByIdAndDelete(req.params.id);
+    if (!doc) return res.status(404).json({ success: false, msg: 'Document not found' });
+
+    const filePath = path.join(documentsUploadDir, doc.storedFileName);
+    fs.unlink(filePath, () => {}); // best-effort cleanup; ignore if already missing
+
+    res.status(200).json({ success: true, msg: 'Document deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // Wildcard fallback route for Angular client-side routing
 app.get('*', (req, res) => {
